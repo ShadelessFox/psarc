@@ -1,15 +1,19 @@
 package sh.adelessfox.psarc;
 
+import atlantafx.base.theme.PrimerLight;
+import atlantafx.base.theme.Styles;
 import javafx.application.Application;
 import javafx.scene.Scene;
-import javafx.scene.control.TreeTableView;
-import javafx.scene.control.TreeView;
+import javafx.scene.control.*;
+import javafx.scene.layout.Priority;
+import javafx.scene.layout.VBox;
 import javafx.stage.Stage;
 import sh.adelessfox.psarc.archive.PsarcArchive;
 import sh.adelessfox.psarc.archive.PsarcAsset;
 import sh.adelessfox.psarc.ui.StructuredTreeItem;
 import sh.adelessfox.psarc.ui.TreeStructure;
 import sh.adelessfox.psarc.util.FilePath;
+import sh.adelessfox.psarc.util.Fugue;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -20,30 +24,96 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 
 public class Main extends Application {
+    public static void main(String[] args) {
+        Application.setUserAgentStylesheet(new PrimerLight().getUserAgentStylesheet());
+        Application.launch(args);
+    }
+
     public void start(Stage stage) {
+        Path path = Path.of("D:/PlayStation Games/Until Dawn TEST70002/USRDIR/data_ps3.psarc");
         PsarcArchive archive;
 
         try {
-            archive = new PsarcArchive(Path.of("D:/PlayStation Games/Until Dawn TEST70002/USRDIR/data_ps3.psarc"), ByteOrder.BIG_ENDIAN);
+            archive = new PsarcArchive(path, ByteOrder.BIG_ENDIAN);
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }
 
-        var structure = ArchiveStructure.fromArchive(archive);
+        var menu = buildMenuBar();
+        var view = buildTreeTableView(archive);
+        var root = new VBox(menu, view);
+        VBox.setVgrow(view, Priority.ALWAYS);
 
-        var view = new TreeView<Element>();
-        view.setRoot(new StructuredTreeItem<>(structure));
-        view.setShowRoot(false);
-
-        stage.setTitle("My JavaFX Application");
-        stage.setScene(new Scene(view));
+        stage.setTitle("PSARC Explorer - " + path);
+        stage.setScene(new Scene(root));
         stage.setWidth(750);
         stage.setHeight(720);
         stage.show();
     }
 
-    public static void main(String[] args) {
-        Application.launch(args);
+    private static MenuBar buildMenuBar() {
+        Menu fileMenu = new Menu("_File");
+        Menu aboutMenu = new Menu("_About");
+
+        MenuBar menuBar = new MenuBar();
+        menuBar.getMenus().addAll(fileMenu, aboutMenu);
+
+        return menuBar;
+    }
+
+    private static TreeTableView<Element> buildTreeTableView(PsarcArchive archive) {
+        var structure = ArchiveStructure.fromArchive(archive);
+
+        var view = new TreeTableView<Element>();
+        view.getStyleClass().add(Styles.DENSE);
+        view.setRoot(new StructuredTreeItem<>(structure));
+        view.setShowRoot(false);
+        view.setColumnResizePolicy(TreeTableView.CONSTRAINED_RESIZE_POLICY_FLEX_LAST_COLUMN);
+        view.getColumns().setAll(buildTreeTableColumns());
+
+        return view;
+    }
+
+    private static List<TreeTableColumn<Element, ?>> buildTreeTableColumns() {
+        var nameColumn = new TreeTableColumn<Element, Element>("Name");
+        nameColumn.setReorderable(false);
+        nameColumn.setSortable(false);
+        nameColumn.setCellValueFactory(features -> features.getValue().valueProperty());
+        nameColumn.setCellFactory(_ -> new TreeTableCell<>() {
+            @Override
+            protected void updateItem(Element item, boolean empty) {
+                super.updateItem(item, empty);
+
+                if (empty) {
+                    setText(null);
+                    setGraphic(null);
+                } else {
+                    setText(item.name);
+                    setGraphic(Fugue.getImageView(item instanceof Element.File ? "document" : "folder"));
+                }
+            }
+        });
+
+        var sizeColumn = new TreeTableColumn<Element, Element>("Size");
+        sizeColumn.setReorderable(false);
+        sizeColumn.setSortable(false);
+        sizeColumn.setMinWidth(100);
+        sizeColumn.setMaxWidth(100);
+        sizeColumn.setCellValueFactory(features -> features.getValue().valueProperty());
+        sizeColumn.setCellFactory(_ -> new TreeTableCell<>() {
+            @Override
+            protected void updateItem(Element item, boolean empty) {
+                super.updateItem(item, empty);
+
+                if (empty) {
+                    setText(null);
+                } else {
+                    setText(item.size);
+                }
+            }
+        });
+
+        return List.of(nameColumn, sizeColumn);
     }
 
     private record ArchiveStructure(
@@ -66,37 +136,41 @@ public class Main extends Application {
 
         @Override
         public Element getRoot() {
-            return new Element.Folder(null, FilePath.of());
+            return new Element.Folder(null, FilePath.of(), 0);
         }
 
         @Override
         public List<? extends Element> getChildren(Element parent) {
-            var files = paths.subMap(parent.path(), parent.path().concat("*"));
+            var files = paths.subMap(parent.path, parent.path.concat("*"));
             var children = new HashMap<FilePath, Element>();
 
-            for (FilePath prefix : getCommonPrefixes(files.keySet(), parent.path().length())) {
-                if (parent.path().equals(prefix)) {
+            for (FilePath prefix : getCommonPrefixes(files.keySet(), parent.path.length())) {
+                if (parent.path.equals(prefix)) {
                     continue;
                 }
-                children.computeIfAbsent(prefix, p -> new Element.Folder(parent, p));
+                children.computeIfAbsent(prefix, p -> {
+                    var files1 = paths.subMap(p, p.concat("*"));
+                    var prefixes1 = getCommonPrefixes(files1.keySet(), p.length());
+                    return new Element.Folder(parent, p, prefixes1.size());
+                });
             }
 
             files.forEach((path, asset) -> {
-                if (path.length() == parent.path().length() + 1) {
-                    children.computeIfAbsent(path, f -> new Element.File(parent, f, asset));
+                if (path.length() == parent.path.length() + 1) {
+                    children.computeIfAbsent(path, f -> new Element.File(f, asset));
                 }
             });
 
             return children.values().stream()
                 .sorted(Comparator
-                    .comparingInt((Element path) -> hasChildren(path) ? -1 : 1)
-                    .thenComparing(Element::toString))
+                    .comparingInt((Element e) -> hasChildren(e) ? -1 : 1)
+                    .thenComparing((Element e) -> e.name))
                 .toList();
         }
 
         @Override
         public boolean hasChildren(Element parent) {
-            return paths.ceilingKey(parent.path()) != parent.path();
+            return paths.ceilingKey(parent.path) != parent.path;
         }
 
         private static List<FilePath> getCommonPrefixes(Collection<FilePath> paths, int offset) {
@@ -123,19 +197,53 @@ public class Main extends Application {
         }
     }
 
-    private sealed interface Element {
-        FilePath path();
+    private static sealed class Element {
+        final FilePath path;
 
-        record File(Element parent, FilePath path, PsarcAsset asset) implements Element {
-            @Override
-            public String toString() {
-                return path.last();
+        final String name;
+        final String size;
+
+        Element(FilePath path, String name, String size) {
+            this.path = path;
+            this.name = name;
+            this.size = size;
+        }
+
+        static final class File extends Element {
+            final PsarcAsset asset;
+
+            File(FilePath path, PsarcAsset asset) {
+                super(path, path.last(), toDisplaySize(asset.size()));
+                this.asset = asset;
+            }
+
+            private static String toDisplaySize(int size) {
+                double value = size;
+                int base = 0;
+                while (value >= 1024 && base < 6) {
+                    value /= 1024;
+                    base += 1;
+                }
+                var unit = switch (base) {
+                    case 0 -> "B";
+                    case 1 -> "kB";
+                    case 2 -> "mB";
+                    case 3 -> "gB";
+                    case 4 -> "tB";
+                    case 5 -> "pB";
+                    case 6 -> "eB";
+                    default -> throw new IllegalStateException();
+                };
+                return "%.2f %s".formatted(value, unit);
             }
         }
 
-        record Folder(Element parent, FilePath path) implements Element {
-            @Override
-            public String toString() {
+        static final class Folder extends Element {
+            Folder(Element parent, FilePath path, int elements) {
+                super(path, toDisplayString(parent, path), "%d items".formatted(elements));
+            }
+
+            private static String toDisplayString(Element parent, FilePath path) {
                 if (parent instanceof Folder folder) {
                     return path.subpath(folder.path.length()).full("\u2009/\u2009");
                 } else if (path.length() > 0) {

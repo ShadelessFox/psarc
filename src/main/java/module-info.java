@@ -1,4 +1,5 @@
 module psarc {
+    requires atlantafx.base;
     requires ch.qos.logback.classic;
     requires ch.qos.logback.core;
     requires javafx.controls;
