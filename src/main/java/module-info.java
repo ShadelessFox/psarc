@@ -1,4 +1,4 @@
-module psarc {
+module psarc.app {
     requires atlantafx.base;
     requires ch.qos.logback.classic;
     requires ch.qos.logback.core;
