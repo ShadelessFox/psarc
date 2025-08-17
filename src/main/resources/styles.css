@@ -1,0 +1,28 @@
+.root {
+  -fx-font-family: "Segoe UI";
+  -fx-font-size: 12px;
+}
+
+.menu-bar {
+  -fx-background-color: transparent;
+  -fx-background-insets: 0;
+}
+
+.menu-bar > .container {
+  -fx-padding: 0px;
+}
+
+.menu-bar > .container > .menu-button {
+  -fx-pref-height: 28px;
+  -fx-background-radius: 0px;
+  -fx-background-insets: 0 0 1px 0;
+  -fx-padding: 3px 6px 3px 6px;
+}
+
+.tree-table-view.dense > .column-header-background .column-header {
+  -fx-size: 28px;
+}
+
+.tree-table-view.dense .tree-table-row-cell > .tree-disclosure-node {
+  -fx-padding: 0 0.5em 0 0.5em;
+}
