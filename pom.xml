@@ -94,9 +94,6 @@
                     <modulePaths>
                         <modulePath>${target.module.path}</modulePath>
                     </modulePaths>
-                    <addModules>
-                        <module>java.naming</module>
-                    </addModules>
                     <jLinkOptions>
                         <jLinkOption>--compress=2</jLinkOption>
                         <jLinkOption>--strip-debug</jLinkOption>
