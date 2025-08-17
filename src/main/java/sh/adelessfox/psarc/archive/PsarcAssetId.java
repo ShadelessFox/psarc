@@ -8,7 +8,7 @@ public record PsarcAssetId(String name) implements AssetId {
     }
 
     @Override
-    public String fullPath() {
+    public String fullName() {
         return name;
     }
 

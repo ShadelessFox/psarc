@@ -9,43 +9,43 @@ import java.text.MessageFormat;
 import java.util.*;
 import java.util.stream.Collectors;
 
-sealed abstract class ArchiveStructure implements TreeStructure<ArchiveStructure> {
-    final NavigableMap<FilePath, Asset<?>> paths;
+sealed abstract class ArchiveStructure<T extends Asset<?>> implements TreeStructure<ArchiveStructure<T>> {
+    final NavigableMap<FilePath, T> paths;
     final FilePath path;
     final String name;
     final String size;
 
-    private ArchiveStructure(NavigableMap<FilePath, Asset<?>> paths, FilePath path, String name, String size) {
+    private ArchiveStructure(NavigableMap<FilePath, T> paths, FilePath path, String name, String size) {
         this.paths = paths;
         this.path = path;
         this.name = name;
         this.size = size;
     }
 
-    static ArchiveStructure of(Archive<?, ?> archive) {
-        var files = new TreeMap<FilePath, Asset<?>>();
-        for (Asset<?> asset : archive.getAll()) {
+    static <T extends Asset<?>> ArchiveStructure<T> of(Archive<?, T> archive) {
+        var files = new TreeMap<FilePath, T>();
+        for (T asset : archive.getAll()) {
             files.put(asset.id().toFilePath(), asset);
         }
         return Folder.of(files, null, FilePath.of());
     }
 
-    static final class File extends ArchiveStructure {
+    static final class File<T extends Asset<?>> extends ArchiveStructure<T> {
         private static final MessageFormat FORMAT = new MessageFormat("{0,number,#.##} {1,choice,0#B|1#kB|2#mB|3#gB}");
 
-        final Asset<?> asset;
+        final T asset;
 
-        File(FilePath path, Asset<?> asset, String name, String size) {
+        File(FilePath path, T asset, String name, String size) {
             super(null, path, name, size);
             this.asset = asset;
         }
 
-        static File of(FilePath path, Asset<?> asset) {
-            return new File(path, asset, path.last(), toDisplaySize(asset.size()));
+        static <T extends Asset<?>> File<T> of(FilePath path, T asset) {
+            return new File<>(path, asset, path.last(), toDisplaySize(asset.size()));
         }
 
         @Override
-        public List<? extends ArchiveStructure> getChildren() {
+        public List<? extends ArchiveStructure<T>> getChildren() {
             return List.of();
         }
 
@@ -61,27 +61,27 @@ sealed abstract class ArchiveStructure implements TreeStructure<ArchiveStructure
         }
     }
 
-    static final class Folder extends ArchiveStructure {
+    static final class Folder<T extends Asset<?>> extends ArchiveStructure<T> {
         private static final MessageFormat FORMAT = new MessageFormat("{0,choice,1#{0} file|1<{0} files}");
 
-        Folder(NavigableMap<FilePath, Asset<?>> paths, FilePath path, String name, String size) {
+        Folder(NavigableMap<FilePath, T> paths, FilePath path, String name, String size) {
             super(paths, path, name, size);
         }
 
-        static Folder of(NavigableMap<FilePath, Asset<?>> paths, Folder parent, FilePath path) {
+        static <T extends Asset<?>> Folder<T> of(NavigableMap<FilePath, T> paths, Folder<T> parent, FilePath path) {
             var files = paths.subMap(path, true, path.concat("*"), true);
             var prefixes = getCommonPrefixes(files.keySet(), path.length());
 
             var name = parent != null ? toDisplayName(parent, path) : "";
             var size = FORMAT.format(new Object[]{prefixes.size()});
 
-            return new Folder(paths, path, name, size);
+            return new Folder<>(paths, path, name, size);
         }
 
         @Override
-        public List<? extends ArchiveStructure> getChildren() {
+        public List<? extends ArchiveStructure<T>> getChildren() {
             var files = paths.subMap(path, true, path.concat("*"), false);
-            var children = new HashMap<FilePath, ArchiveStructure>();
+            var children = new HashMap<FilePath, ArchiveStructure<T>>();
 
             for (FilePath prefix : getCommonPrefixes(files.keySet(), path.length())) {
                 if (path.equals(prefix)) {
@@ -100,8 +100,8 @@ sealed abstract class ArchiveStructure implements TreeStructure<ArchiveStructure
 
             return children.values().stream()
                 .sorted(Comparator
-                    .comparingInt((ArchiveStructure e) -> e.hasChildren() ? -1 : 1)
-                    .thenComparing((ArchiveStructure e) -> e.name))
+                    .comparingInt((ArchiveStructure<T> e) -> e.hasChildren() ? -1 : 1)
+                    .thenComparing((ArchiveStructure<T> e) -> e.name))
                 .toList();
         }
 
@@ -110,7 +110,7 @@ sealed abstract class ArchiveStructure implements TreeStructure<ArchiveStructure
             return true;
         }
 
-        private static String toDisplayName(Folder parent, FilePath path) {
+        private static String toDisplayName(Folder<?> parent, FilePath path) {
             return path.subpath(parent.path.length()).full("\u2009/\u2009");
         }
 

@@ -3,12 +3,16 @@ package sh.adelessfox.psarc.archive;
 import sh.adelessfox.psarc.util.FilePath;
 
 public interface AssetId extends Comparable<AssetId> {
-    String fullPath();
+    String fullName();
+
+    default String fileName() {
+        return toFilePath().last();
+    }
 
     FilePath toFilePath();
 
     @Override
     default int compareTo(AssetId o) {
-        return fullPath().compareTo(o.fullPath());
+        return fullName().compareTo(o.fullName());
     }
 }

@@ -8,6 +8,9 @@ import javafx.scene.control.*;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.VBox;
 import javafx.stage.Stage;
+import sh.adelessfox.psarc.archive.Archive;
+import sh.adelessfox.psarc.archive.Asset;
+import sh.adelessfox.psarc.archive.AssetId;
 import sh.adelessfox.psarc.archive.PsarcArchive;
 import sh.adelessfox.psarc.ui.StructuredTreeItem;
 import sh.adelessfox.psarc.util.Fugue;
@@ -56,27 +59,28 @@ public class Main extends Application {
         return menuBar;
     }
 
-    private static TreeTableView<ArchiveStructure> buildTreeTableView(PsarcArchive archive) {
+    private static <K extends AssetId, V extends Asset<K>> TreeTableView<ArchiveStructure<V>> buildTreeTableView(Archive<K, V> archive) {
         var structure = ArchiveStructure.of(archive);
 
-        var view = new TreeTableView<ArchiveStructure>();
+        var view = new TreeTableView<ArchiveStructure<V>>();
         view.getStyleClass().add(Styles.DENSE);
         view.setRoot(new StructuredTreeItem<>(structure));
         view.setShowRoot(false);
         view.setColumnResizePolicy(TreeTableView.CONSTRAINED_RESIZE_POLICY_FLEX_LAST_COLUMN);
         view.getColumns().setAll(buildTreeTableColumns());
 
+
         return view;
     }
 
-    private static List<TreeTableColumn<ArchiveStructure, ?>> buildTreeTableColumns() {
-        var nameColumn = new TreeTableColumn<ArchiveStructure, ArchiveStructure>("Name");
+    private static <T extends Asset<?>> List<TreeTableColumn<ArchiveStructure<T>, ?>> buildTreeTableColumns() {
+        var nameColumn = new TreeTableColumn<ArchiveStructure<T>, ArchiveStructure<T>>("Name");
         nameColumn.setReorderable(false);
         nameColumn.setSortable(false);
         nameColumn.setCellValueFactory(features -> features.getValue().valueProperty());
         nameColumn.setCellFactory(_ -> new TreeTableCell<>() {
             @Override
-            protected void updateItem(ArchiveStructure item, boolean empty) {
+            protected void updateItem(ArchiveStructure<T> item, boolean empty) {
                 super.updateItem(item, empty);
 
                 if (empty) {
@@ -89,7 +93,7 @@ public class Main extends Application {
             }
         });
 
-        var sizeColumn = new TreeTableColumn<ArchiveStructure, ArchiveStructure>("Size");
+        var sizeColumn = new TreeTableColumn<ArchiveStructure<T>, ArchiveStructure<T>>("Size");
         sizeColumn.setReorderable(false);
         sizeColumn.setSortable(false);
         sizeColumn.setMinWidth(100);
@@ -97,7 +101,7 @@ public class Main extends Application {
         sizeColumn.setCellValueFactory(features -> features.getValue().valueProperty());
         sizeColumn.setCellFactory(_ -> new TreeTableCell<>() {
             @Override
-            protected void updateItem(ArchiveStructure item, boolean empty) {
+            protected void updateItem(ArchiveStructure<T> item, boolean empty) {
                 super.updateItem(item, empty);
 
                 if (empty) {

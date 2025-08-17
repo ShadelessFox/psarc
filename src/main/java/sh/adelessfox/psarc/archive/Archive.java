@@ -5,7 +5,6 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.Collection;
 import java.util.Optional;
-import java.util.stream.Stream;
 
 public interface Archive<K extends AssetId, V extends Asset<K>> extends Closeable {
     Optional<V> get(K key);

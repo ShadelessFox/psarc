@@ -7,13 +7,13 @@ import sh.adelessfox.psarc.hashing.HashCode;
 import sh.adelessfox.psarc.hashing.HashFunction;
 import sh.adelessfox.psarc.io.BinaryReader;
 
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.*;
-import java.util.stream.Stream;
 
 public final class PsarcArchive implements Archive<PsarcAssetId, PsarcAsset> {
     private static final Logger log = LoggerFactory.getLogger(PsarcArchive.class);
@@ -66,7 +66,7 @@ public final class PsarcArchive implements Archive<PsarcAssetId, PsarcAsset> {
 
     @Override
     public Optional<PsarcAsset> get(PsarcAssetId key) {
-        return Optional.empty();
+        return Optional.ofNullable(assets.get(transformId(key)));
     }
 
     @Override
@@ -76,7 +76,8 @@ public final class PsarcArchive implements Archive<PsarcAssetId, PsarcAsset> {
 
     @Override
     public ByteBuffer read(PsarcAssetId key) throws IOException {
-        throw new IOException();
+        var asset = get(key).orElseThrow(FileNotFoundException::new);
+        return read(asset.uncompressedSize(), asset.blockOffset(), asset.fileOffset());
     }
 
     @Override
@@ -89,11 +90,11 @@ public final class PsarcArchive implements Archive<PsarcAssetId, PsarcAsset> {
     }
 
     private String[] readManifest(Entry entry) throws IOException {
-        byte[] manifest = read(entry.uncompressedSize, entry.blockOffset, entry.fileOffset);
+        byte[] manifest = read(entry.uncompressedSize, entry.blockOffset, entry.fileOffset).array();
         return new String(manifest, StandardCharsets.UTF_8).split("\n");
     }
 
-    private byte[] read(long uncompressedSize, int index, long blockOffset) throws IOException {
+    private ByteBuffer read(long uncompressedSize, int index, long blockOffset) throws IOException {
         var output = ByteBuffer.allocate(Math.toIntExact(uncompressedSize));
         var buffer = new byte[header.blockSize()];
 
@@ -113,7 +114,7 @@ public final class PsarcArchive implements Archive<PsarcAssetId, PsarcAsset> {
             }
         }
 
-        return output.array();
+        return output.position(0);
     }
 
     private record Header(
