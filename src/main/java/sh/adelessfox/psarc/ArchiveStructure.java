@@ -8,6 +8,7 @@ import sh.adelessfox.psarc.util.FilePath;
 import java.text.MessageFormat;
 import java.util.*;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 sealed abstract class ArchiveStructure<T extends Asset<?>> implements TreeStructure<ArchiveStructure<T>> {
     final NavigableMap<FilePath, T> paths;
@@ -23,11 +24,11 @@ sealed abstract class ArchiveStructure<T extends Asset<?>> implements TreeStruct
     }
 
     static <T extends Asset<?>> ArchiveStructure<T> of(Archive<?, T> archive) {
-        var files = new TreeMap<FilePath, T>();
+        var paths = new TreeMap<FilePath, T>();
         for (T asset : archive.getAll()) {
-            files.put(asset.id().toFilePath(), asset);
+            paths.put(asset.id().toFilePath(), asset);
         }
-        return Folder.of(files, null, FilePath.of());
+        return Folder.of(paths, null, FilePath.of());
     }
 
     static final class File<T extends Asset<?>> extends ArchiveStructure<T> {
@@ -69,32 +70,22 @@ sealed abstract class ArchiveStructure<T extends Asset<?>> implements TreeStruct
         }
 
         static <T extends Asset<?>> Folder<T> of(NavigableMap<FilePath, T> paths, Folder<T> parent, FilePath path) {
-            var files = paths.subMap(path, true, path.concat("*"), true);
-            var prefixes = getCommonPrefixes(files.keySet(), path.length());
-
+            int children = (int) collectChildren(paths, path).count();
             var name = parent != null ? toDisplayName(parent, path) : "";
-            var size = FORMAT.format(new Object[]{prefixes.size()});
+            var size = FORMAT.format(new Object[]{children});
 
             return new Folder<>(paths, path, name, size);
         }
 
         @Override
         public List<? extends ArchiveStructure<T>> getChildren() {
-            var files = paths.subMap(path, true, path.concat("*"), false);
             var children = new HashMap<FilePath, ArchiveStructure<T>>();
 
-            for (FilePath prefix : getCommonPrefixes(files.keySet(), path.length())) {
-                if (path.equals(prefix)) {
-                    // Same folder
-                    continue;
-                }
-                children.computeIfAbsent(prefix, p -> Folder.of(files, this, p));
-            }
-
-            files.forEach((path, asset) -> {
-                if (path.length() == this.path.length() + 1) {
-                    // File is a direct child of this folder
-                    children.computeIfAbsent(path, f -> File.of(f, asset));
+            collectChildren(paths, path).forEach(child -> {
+                if (child.asset() != null) {
+                    children.computeIfAbsent(child.path(), path -> File.of(path, child.asset()));
+                } else {
+                    children.computeIfAbsent(child.path(), path -> Folder.of(paths, this, path));
                 }
             });
 
@@ -114,12 +105,33 @@ sealed abstract class ArchiveStructure<T extends Asset<?>> implements TreeStruct
             return path.subpath(parent.path.length()).full("\u2009/\u2009");
         }
 
-        private static Set<FilePath> getCommonPrefixes(Collection<FilePath> paths, int offset) {
+        private static <T extends Asset<?>> Stream<PathWithAsset<T>> collectChildren(NavigableMap<FilePath, T> paths, FilePath path) {
+            var children = paths.subMap(path, true, path.concat("*"), false);
+            return Stream.concat(
+                collectFolders(children, path),
+                collectFiles(children, path)
+            );
+        }
+
+        private static <T extends Asset<?>> Stream<PathWithAsset<T>> collectFolders(NavigableMap<FilePath, T> paths, FilePath path) {
+            return collectCommonPrefixes(paths.keySet(), path)
+                .map(p -> new PathWithAsset<>(p, null));
+        }
+
+        private static <T extends Asset<?>> Stream<PathWithAsset<T>> collectFiles(NavigableMap<FilePath, T> paths, FilePath path) {
+            return paths.entrySet().stream()
+                .filter(entry -> path.length() + 1 == entry.getKey().length())
+                .map(entry -> new PathWithAsset<>(entry.getKey(), entry.getValue()));
+        }
+
+        private static Stream<FilePath> collectCommonPrefixes(Collection<FilePath> paths, FilePath path) {
+            int offset = path.length();
             return paths.stream()
                 .collect(Collectors.groupingBy(p -> p.get(offset)))
                 .values().stream()
                 .map(p -> getCommonPrefix(p, offset))
-                .collect(Collectors.toSet());
+                .distinct()
+                .filter(p -> !p.equals(path));
         }
 
         private static FilePath getCommonPrefix(List<FilePath> paths, int offset) {
@@ -135,6 +147,9 @@ sealed abstract class ArchiveStructure<T extends Asset<?>> implements TreeStruct
             }
 
             return path.subpath(0, position);
+        }
+
+        private record PathWithAsset<T extends Asset<?>>(FilePath path, T asset) {
         }
     }
 }
