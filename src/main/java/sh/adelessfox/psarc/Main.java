@@ -5,9 +5,17 @@ import atlantafx.base.theme.Styles;
 import javafx.application.Application;
 import javafx.scene.Scene;
 import javafx.scene.control.*;
+import javafx.scene.control.Menu;
+import javafx.scene.control.MenuBar;
+import javafx.scene.input.DataFormat;
+import javafx.scene.input.Dragboard;
+import javafx.scene.input.MouseButton;
+import javafx.scene.input.TransferMode;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.VBox;
 import javafx.stage.Stage;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import sh.adelessfox.psarc.archive.Archive;
 import sh.adelessfox.psarc.archive.Asset;
 import sh.adelessfox.psarc.archive.AssetId;
@@ -15,13 +23,21 @@ import sh.adelessfox.psarc.archive.PsarcArchive;
 import sh.adelessfox.psarc.ui.StructuredTreeItem;
 import sh.adelessfox.psarc.util.Fugue;
 
+import java.awt.*;
+import java.io.File;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.ByteOrder;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Map;
+
+import static java.nio.file.StandardOpenOption.*;
 
 public class Main extends Application {
+    private static final Logger log = LoggerFactory.getLogger(Main.class);
+
     public static void main(String[] args) {
         Application.setUserAgentStylesheet(new PrimerLight().getUserAgentStylesheet());
         Application.launch(args);
@@ -69,8 +85,63 @@ public class Main extends Application {
         view.setColumnResizePolicy(TreeTableView.CONSTRAINED_RESIZE_POLICY_FLEX_LAST_COLUMN);
         view.getColumns().setAll(buildTreeTableColumns());
 
+        // Drag & drop
+        view.setOnDragDetected(event -> {
+            var item = view.getSelectionModel().getSelectedItem();
+            if (!(item.getValue() instanceof ArchiveStructure.File<V> file)) {
+                return;
+            }
+
+            File result;
+
+            try {
+                result = extractToTemporaryFile(archive, file.asset).toFile();
+            } catch (IOException e) {
+                throw new UncheckedIOException(e);
+            }
+
+            Dragboard dragboard = view.startDragAndDrop(TransferMode.MOVE);
+            dragboard.setContent(Map.of(DataFormat.FILES, List.of(result)));
+            event.consume();
+        });
+
+        // Double-click
+        view.setOnMouseClicked(event -> {
+            if (event.getButton() != MouseButton.PRIMARY || event.getClickCount() % 2 != 0) {
+                return;
+            }
+
+            var item = view.getSelectionModel().getSelectedItem();
+            if (!(item.getValue() instanceof ArchiveStructure.File<V> file)) {
+                return;
+            }
+
+            try {
+                Desktop.getDesktop().open(extractToTemporaryFile(archive, file.asset).toFile());
+            } catch (IOException e) {
+                throw new UncheckedIOException(e);
+            }
+        });
 
         return view;
+    }
+
+    private static <K extends AssetId, V extends Asset<K>> Path extractToTemporaryFile(Archive<K, V> archive, V asset) throws IOException {
+        var id = asset.id();
+        var root = Path.of(System.getProperty("java.io.tmpdir"), "psarc-dnd");
+        var path = root.resolve(id.fileName());
+
+        log.debug("Creating a temporary file {}", path);
+
+        if (Files.notExists(root)) {
+            Files.createDirectory(root);
+        }
+
+        try (var channel = Files.newByteChannel(path, WRITE, CREATE, TRUNCATE_EXISTING)) {
+            channel.write(archive.read(id));
+        }
+
+        return path;
     }
 
     private static <T extends Asset<?>> List<TreeTableColumn<ArchiveStructure<T>, ?>> buildTreeTableColumns() {
