@@ -12,6 +12,7 @@
         <maven.compiler.source>24</maven.compiler.source>
         <maven.compiler.target>24</maven.compiler.target>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <target.module.path>target/modules</target.module.path>
     </properties>
 
     <dependencies>
@@ -46,6 +47,67 @@
                 <configuration>
                     <mainClass>sh.adelessfox.psarc.Main</mainClass>
                 </configuration>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-jar-plugin</artifactId>
+                <configuration>
+                    <outputDirectory>${target.module.path}</outputDirectory>
+                </configuration>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-dependency-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>copy-dependencies</id>
+                        <phase>package</phase>
+                        <goals>
+                            <goal>copy-dependencies</goal>
+                        </goals>
+                        <configuration>
+                            <includeScope>runtime</includeScope>
+                            <outputDirectory>${target.module.path}</outputDirectory>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <groupId>org.panteleyev</groupId>
+                <artifactId>jpackage-maven-plugin</artifactId>
+                <version>1.6.5</version>
+                <configuration>
+                    <type>APP_IMAGE</type>
+                    <appVersion>1.0</appVersion>
+                    <name>${project.name}</name>
+                    <destination>target/dist</destination>
+                    <vendor>ShadelessFox</vendor>
+                    <modulePaths>
+                        <modulePath>${target.module.path}</modulePath>
+                    </modulePaths>
+                    <addModules>
+                        <module>java.naming</module>
+                    </addModules>
+                    <jLinkOptions>
+                        <jLinkOption>--compress=2</jLinkOption>
+                        <jLinkOption>--strip-debug</jLinkOption>
+                        <jLinkOption>--strip-native-commands</jLinkOption>
+                        <jLinkOption>--no-header-files</jLinkOption>
+                        <jLinkOption>--no-man-pages</jLinkOption>
+                    </jLinkOptions>
+                    <javaOptions>
+                        <javaOption>--enable-native-access=javafx.graphics</javaOption>
+                    </javaOptions>
+                    <module>psarc.app/sh.adelessfox.psarc.Main</module>
+                </configuration>
+                <executions>
+                    <execution>
+                        <phase>package</phase>
+                        <goals>
+                            <goal>jpackage</goal>
+                        </goals>
+                    </execution>
+                </executions>
             </plugin>
         </plugins>
     </build>
