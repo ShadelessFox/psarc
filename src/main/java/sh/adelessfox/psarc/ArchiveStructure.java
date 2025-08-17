@@ -31,6 +31,8 @@ sealed abstract class ArchiveStructure implements TreeStructure<ArchiveStructure
     }
 
     static final class File extends ArchiveStructure {
+        private static final MessageFormat FORMAT = new MessageFormat("{0,number,#.##} {1,choice,0#B|1#kB|2#mB|3#gB}");
+
         final Asset<?> asset;
 
         File(FilePath path, Asset<?> asset, String name, String size) {
@@ -53,23 +55,9 @@ sealed abstract class ArchiveStructure implements TreeStructure<ArchiveStructure
         }
 
         private static String toDisplaySize(int size) {
-            double value = size;
-            int base = 0;
-            while (value >= 1024 && base < 6) {
-                value /= 1024;
-                base += 1;
-            }
-            var unit = switch (base) {
-                case 0 -> "B";
-                case 1 -> "kB";
-                case 2 -> "mB";
-                case 3 -> "gB";
-                case 4 -> "tB";
-                case 5 -> "pB";
-                case 6 -> "eB";
-                default -> throw new IllegalStateException();
-            };
-            return "%.2f %s".formatted(value, unit);
+            var exp = (int) (Math.log10(size) / Math.log10(1024)) - 1;
+            var rem = (double) size / (1L << 10 * exp);
+            return FORMAT.format(new Object[]{rem, exp});
         }
     }
 
