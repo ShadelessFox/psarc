@@ -49,6 +49,10 @@
                 <version>0.0.8</version>
                 <configuration>
                     <mainClass>sh.adelessfox.psarc.Main</mainClass>
+                    <options>
+                        <option>--enable-native-access=javafx.graphics</option>
+                        <option>-Dprism.forceUploadingPainter=true</option>
+                    </options>
                 </configuration>
             </plugin>
             <plugin>
@@ -100,6 +104,7 @@
                     </jLinkOptions>
                     <javaOptions>
                         <javaOption>--enable-native-access=javafx.graphics</javaOption>
+                        <javaOption>-Dprism.forceUploadingPainter=true</javaOption>
                     </javaOptions>
                     <module>psarc.app/sh.adelessfox.psarc.Main</module>
                 </configuration>

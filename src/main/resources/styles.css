@@ -1,22 +1,9 @@
 .root {
   -fx-font-family: "Segoe UI";
   -fx-font-size: 12px;
-}
 
-.menu-bar {
-  -fx-background-color: transparent;
-  -fx-background-insets: 0;
-}
-
-.menu-bar > .container {
-  -fx-padding: 0px;
-}
-
-.menu-bar > .container > .menu-button {
-  -fx-pref-height: 28px;
-  -fx-background-radius: 0px;
-  -fx-background-insets: 0 0 1px 0;
-  -fx-padding: 3px 6px 3px 6px;
+  -color-base-1-mica: rgba(234, 238, 242, 0.5);
+  -color-base-2-mica: rgba(208, 215, 222, 0.5);
 }
 
 .tree-table-view.dense > .column-header-background .column-header {
@@ -33,4 +20,26 @@
   -fx-border-style: solid;
   -fx-alignment: CENTER_RIGHT;
   -fx-padding: 4px 12px 4px 12px;
+}
+
+.tool-bar.mica > .container > .button {
+  -fx-background-color: transparent;
+  -fx-padding: 6px 8px 6px 8px;
+}
+
+.tool-bar.mica > .container > .button:hover {
+  -fx-background-color: -color-base-1-mica, -color-base-2-mica;
+  -fx-opacity: 1;
+}
+
+.tree-table-view.mica > .column-header-background {
+  -fx-background-color: transparent;
+}
+
+.tree-table-view.mica .tree-table-row-cell {
+  -fx-background-color: transparent;
+}
+
+.mica {
+    -fx-background-color: transparent;
 }

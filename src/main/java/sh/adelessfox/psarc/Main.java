@@ -1,5 +1,6 @@
 package sh.adelessfox.psarc;
 
+import atlantafx.base.controls.Spacer;
 import atlantafx.base.theme.PrimerLight;
 import atlantafx.base.theme.Styles;
 import atlantafx.base.theme.Tweaks;
@@ -15,9 +16,11 @@ import javafx.scene.input.Dragboard;
 import javafx.scene.input.MouseButton;
 import javafx.scene.input.TransferMode;
 import javafx.scene.layout.BorderPane;
+import javafx.scene.paint.Color;
 import javafx.stage.FileChooser;
 import javafx.stage.FileChooser.ExtensionFilter;
 import javafx.stage.Stage;
+import javafx.stage.StageStyle;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import sh.adelessfox.psarc.archive.Archive;
@@ -26,6 +29,7 @@ import sh.adelessfox.psarc.archive.AssetId;
 import sh.adelessfox.psarc.archive.PsarcArchive;
 import sh.adelessfox.psarc.ui.StructuredTreeItem;
 import sh.adelessfox.psarc.util.Fugue;
+import sh.adelessfox.psarc.util.Mica;
 
 import java.awt.*;
 import java.io.File;
@@ -56,13 +60,15 @@ public class Main extends Application {
         this.stage = stage;
 
         var root = new BorderPane();
+        root.getStyleClass().add("mica");
         root.setTop(buildToolBar());
         root.setCenter(buildTreeTableView());
         root.setBottom(buildStatusBar());
 
-        var scene = new Scene(root);
+        var scene = new Scene(root, Color.TRANSPARENT);
         scene.getStylesheets().add(getClass().getResource("/styles.css").toExternalForm());
 
+        stage.initStyle(StageStyle.UNIFIED);
         stage.setScene(scene);
         stage.setWidth(750);
         stage.setHeight(720);
@@ -73,6 +79,8 @@ public class Main extends Application {
                 .then(Bindings.format("%s - %s", TITLE, path))
                 .otherwise(TITLE)
         );
+
+        Mica.install(stage);
     }
 
     public void setPath(Path path) {
@@ -103,19 +111,36 @@ public class Main extends Application {
         }
     }
 
+    private void extractArchive() {
+    }
+
+    private void showAboutDialog() {
+    }
+
     private ToolBar buildToolBar() {
         Button openButton = new Button("_Open\u2026", Fugue.getImageView("folder-open-document"));
         openButton.setOnAction(_ -> chooseArchive());
 
-        return new ToolBar(openButton);
+        Button extractButton = new Button("_Extract\u2026", Fugue.getImageView("folder-export"));
+        extractButton.setOnAction(_ -> extractArchive());
+
+        Button aboutButton = new Button("About", Fugue.getImageView("question-white"));
+        aboutButton.setOnAction(_ -> showAboutDialog());
+
+        ToolBar toolBar = new ToolBar(openButton, extractButton, new Spacer(), aboutButton);
+        toolBar.getStyleClass().add("mica");
+
+        return toolBar;
     }
 
     private StatusBar buildStatusBar() {
         StatusBar statusBar = new StatusBar();
+        statusBar.getStyleClass().add("mica");
 
         archive.addListener((_, _, newValue) -> {
             if (newValue == null) {
-                statusBar.setVisible(false);
+                statusBar.setTotalFiles(0);
+                statusBar.setTotalSize(0);
                 return;
             }
 
@@ -127,7 +152,6 @@ public class Main extends Application {
                 size += asset.size();
             }
 
-            statusBar.setVisible(true);
             statusBar.setTotalFiles(count);
             statusBar.setTotalSize(size);
         });
@@ -137,7 +161,7 @@ public class Main extends Application {
 
     private <K extends AssetId, V extends Asset<K>> TreeTableView<ArchiveStructure<V>> buildTreeTableView() {
         var view = new TreeTableView<ArchiveStructure<V>>();
-        view.getStyleClass().addAll(Styles.DENSE, Tweaks.EDGE_TO_EDGE);
+        view.getStyleClass().addAll(Styles.BG_DEFAULT, Styles.DENSE, Tweaks.EDGE_TO_EDGE);
         view.setShowRoot(false);
         view.setColumnResizePolicy(TreeTableView.CONSTRAINED_RESIZE_POLICY_FLEX_LAST_COLUMN);
         view.getColumns().setAll(buildTreeTableColumns());
