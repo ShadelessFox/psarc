@@ -70,8 +70,8 @@ public final class PsarcArchive implements Archive<PsarcAssetId, PsarcAsset> {
     }
 
     @Override
-    public Stream<PsarcAsset> getAll() {
-        return assets.values().stream();
+    public Collection<PsarcAsset> getAll() {
+        return assets.values();
     }
 
     @Override

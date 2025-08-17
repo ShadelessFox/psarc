@@ -1,0 +1,152 @@
+package sh.adelessfox.psarc;
+
+import sh.adelessfox.psarc.archive.Archive;
+import sh.adelessfox.psarc.archive.Asset;
+import sh.adelessfox.psarc.ui.TreeStructure;
+import sh.adelessfox.psarc.util.FilePath;
+
+import java.text.MessageFormat;
+import java.util.*;
+import java.util.stream.Collectors;
+
+sealed abstract class ArchiveStructure implements TreeStructure<ArchiveStructure> {
+    final NavigableMap<FilePath, Asset<?>> paths;
+    final FilePath path;
+    final String name;
+    final String size;
+
+    private ArchiveStructure(NavigableMap<FilePath, Asset<?>> paths, FilePath path, String name, String size) {
+        this.paths = paths;
+        this.path = path;
+        this.name = name;
+        this.size = size;
+    }
+
+    static ArchiveStructure of(Archive<?, ?> archive) {
+        var files = new TreeMap<FilePath, Asset<?>>();
+        for (Asset<?> asset : archive.getAll()) {
+            files.put(asset.id().toFilePath(), asset);
+        }
+        return Folder.of(files, null, FilePath.of());
+    }
+
+    static final class File extends ArchiveStructure {
+        final Asset<?> asset;
+
+        File(FilePath path, Asset<?> asset, String name, String size) {
+            super(null, path, name, size);
+            this.asset = asset;
+        }
+
+        static File of(FilePath path, Asset<?> asset) {
+            return new File(path, asset, path.last(), toDisplaySize(asset.size()));
+        }
+
+        @Override
+        public List<? extends ArchiveStructure> getChildren() {
+            return List.of();
+        }
+
+        @Override
+        public boolean hasChildren() {
+            return false;
+        }
+
+        private static String toDisplaySize(int size) {
+            double value = size;
+            int base = 0;
+            while (value >= 1024 && base < 6) {
+                value /= 1024;
+                base += 1;
+            }
+            var unit = switch (base) {
+                case 0 -> "B";
+                case 1 -> "kB";
+                case 2 -> "mB";
+                case 3 -> "gB";
+                case 4 -> "tB";
+                case 5 -> "pB";
+                case 6 -> "eB";
+                default -> throw new IllegalStateException();
+            };
+            return "%.2f %s".formatted(value, unit);
+        }
+    }
+
+    static final class Folder extends ArchiveStructure {
+        private static final MessageFormat FORMAT = new MessageFormat("{0,choice,1#{0} file|1<{0} files}");
+
+        Folder(NavigableMap<FilePath, Asset<?>> paths, FilePath path, String name, String size) {
+            super(paths, path, name, size);
+        }
+
+        static Folder of(NavigableMap<FilePath, Asset<?>> paths, Folder parent, FilePath path) {
+            var files = paths.subMap(path, true, path.concat("*"), true);
+            var prefixes = getCommonPrefixes(files.keySet(), path.length());
+
+            var name = parent != null ? toDisplayName(parent, path) : "";
+            var size = FORMAT.format(new Object[]{prefixes.size()});
+
+            return new Folder(paths, path, name, size);
+        }
+
+        @Override
+        public List<? extends ArchiveStructure> getChildren() {
+            var files = paths.subMap(path, true, path.concat("*"), false);
+            var children = new HashMap<FilePath, ArchiveStructure>();
+
+            for (FilePath prefix : getCommonPrefixes(files.keySet(), path.length())) {
+                if (path.equals(prefix)) {
+                    // Same folder
+                    continue;
+                }
+                children.computeIfAbsent(prefix, p -> Folder.of(files, this, p));
+            }
+
+            files.forEach((path, asset) -> {
+                if (path.length() == this.path.length() + 1) {
+                    // File is a direct child of this folder
+                    children.computeIfAbsent(path, f -> File.of(f, asset));
+                }
+            });
+
+            return children.values().stream()
+                .sorted(Comparator
+                    .comparingInt((ArchiveStructure e) -> e.hasChildren() ? -1 : 1)
+                    .thenComparing((ArchiveStructure e) -> e.name))
+                .toList();
+        }
+
+        @Override
+        public boolean hasChildren() {
+            return true;
+        }
+
+        private static String toDisplayName(Folder parent, FilePath path) {
+            return path.subpath(parent.path.length()).full("\u2009/\u2009");
+        }
+
+        private static Set<FilePath> getCommonPrefixes(Collection<FilePath> paths, int offset) {
+            return paths.stream()
+                .collect(Collectors.groupingBy(p -> p.get(offset)))
+                .values().stream()
+                .map(p -> getCommonPrefix(p, offset))
+                .collect(Collectors.toSet());
+        }
+
+        private static FilePath getCommonPrefix(List<FilePath> paths, int offset) {
+            var path = paths.getFirst();
+            int position = Math.min(offset, path.length() - 1);
+
+            for (; position < path.length() - 1; position++) {
+                for (FilePath other : paths) {
+                    if (other.length() < position || !path.get(position).equals(other.get(position))) {
+                        return path.subpath(0, position);
+                    }
+                }
+            }
+
+            return path.subpath(0, position);
+        }
+    }
+}

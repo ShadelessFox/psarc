@@ -5,19 +5,13 @@ import javafx.scene.control.TreeItem;
 
 import java.util.List;
 
-public final class StructuredTreeItem<T> extends TreeItem<T> {
-    private final TreeStructure<T> structure;
+public final class StructuredTreeItem<T extends TreeStructure<T>> extends TreeItem<T> {
     private boolean isFirstTimeChildren = true;
     private boolean isFirstTimeLeaf = true;
     private boolean isLeaf;
 
-    public StructuredTreeItem(TreeStructure<T> structure, T value) {
-        super(value);
-        this.structure = structure;
-    }
-
-    public StructuredTreeItem(TreeStructure<T> structure) {
-        this(structure, structure.getRoot());
+    public StructuredTreeItem(T structure) {
+        super(structure);
     }
 
     @Override
@@ -33,14 +27,14 @@ public final class StructuredTreeItem<T> extends TreeItem<T> {
     public boolean isLeaf() {
         if (isFirstTimeLeaf) {
             isFirstTimeLeaf = false;
-            isLeaf = !structure.hasChildren(getValue());
+            isLeaf = !getValue().hasChildren();
         }
         return isLeaf;
     }
 
     private List<? extends TreeItem<T>> buildChildren() {
-        return structure.getChildren(getValue()).stream()
-            .map(child -> new StructuredTreeItem<>(structure, child))
+        return getValue().getChildren().stream()
+            .map(StructuredTreeItem::new)
             .toList();
     }
 }
