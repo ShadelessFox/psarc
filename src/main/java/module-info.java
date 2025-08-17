@@ -8,4 +8,5 @@ module psarc {
     requires org.slf4j;
 
     exports sh.adelessfox.psarc to javafx.graphics;
+    exports sh.adelessfox.psarc.archive;
 }

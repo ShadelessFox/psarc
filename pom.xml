@@ -13,6 +13,9 @@
         <maven.compiler.target>24</maven.compiler.target>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <target.module.path>target/modules</target.module.path>
+
+        <lib.javafx.version>24.0.2</lib.javafx.version>
+        <lib.ikonli.version>12.3.1</lib.ikonli.version>
     </properties>
 
     <dependencies>
@@ -24,7 +27,7 @@
         <dependency>
             <groupId>org.openjfx</groupId>
             <artifactId>javafx-controls</artifactId>
-            <version>26-ea+3</version>
+            <version>${lib.javafx.version}</version>
         </dependency>
         <dependency>
             <groupId>org.slf4j</groupId>

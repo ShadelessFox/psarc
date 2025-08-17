@@ -4,8 +4,8 @@ import sh.adelessfox.psarc.archive.Archive;
 import sh.adelessfox.psarc.archive.Asset;
 import sh.adelessfox.psarc.ui.TreeStructure;
 import sh.adelessfox.psarc.util.FilePath;
+import sh.adelessfox.psarc.util.Formatters;
 
-import java.text.MessageFormat;
 import java.util.*;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -32,8 +32,6 @@ sealed abstract class ArchiveStructure<T extends Asset<?>> implements TreeStruct
     }
 
     static final class File<T extends Asset<?>> extends ArchiveStructure<T> {
-        private static final MessageFormat FORMAT = new MessageFormat("{0,number,#.##} {1,choice,0#B|1#kB|2#mB|3#gB}");
-
         final T asset;
 
         File(FilePath path, T asset, String name, String size) {
@@ -42,7 +40,7 @@ sealed abstract class ArchiveStructure<T extends Asset<?>> implements TreeStruct
         }
 
         static <T extends Asset<?>> File<T> of(FilePath path, T asset) {
-            return new File<>(path, asset, path.last(), toDisplaySize(asset.size()));
+            return new File<>(path, asset, path.last(), Formatters.formatSize(asset.size()));
         }
 
         @Override
@@ -54,17 +52,9 @@ sealed abstract class ArchiveStructure<T extends Asset<?>> implements TreeStruct
         public boolean hasChildren() {
             return false;
         }
-
-        private static String toDisplaySize(int size) {
-            var exp = (int) (Math.log10(size) / Math.log10(1024));
-            var rem = (double) size / (1L << 10 * exp);
-            return FORMAT.format(new Object[]{rem, exp});
-        }
     }
 
     static final class Folder<T extends Asset<?>> extends ArchiveStructure<T> {
-        private static final MessageFormat FORMAT = new MessageFormat("{0,choice,1#{0} file|1<{0} files}");
-
         Folder(NavigableMap<FilePath, T> paths, FilePath path, String name, String size) {
             super(paths, path, name, size);
         }
@@ -72,7 +62,7 @@ sealed abstract class ArchiveStructure<T extends Asset<?>> implements TreeStruct
         static <T extends Asset<?>> Folder<T> of(NavigableMap<FilePath, T> paths, Folder<T> parent, FilePath path) {
             int children = (int) collectChildren(paths, path).count();
             var name = parent != null ? toDisplayName(parent, path) : "";
-            var size = FORMAT.format(new Object[]{children});
+            var size = Formatters.formatFiles(children);
 
             return new Folder<>(paths, path, name, size);
         }

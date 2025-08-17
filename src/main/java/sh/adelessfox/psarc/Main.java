@@ -4,18 +4,20 @@ import atlantafx.base.theme.PrimerLight;
 import atlantafx.base.theme.Styles;
 import atlantafx.base.theme.Tweaks;
 import javafx.application.Application;
+import javafx.beans.binding.Bindings;
+import javafx.beans.property.ObjectProperty;
+import javafx.beans.property.SimpleObjectProperty;
 import javafx.scene.Scene;
 import javafx.scene.control.*;
-import javafx.scene.control.Menu;
-import javafx.scene.control.MenuBar;
+import javafx.scene.control.Button;
 import javafx.scene.input.DataFormat;
 import javafx.scene.input.Dragboard;
 import javafx.scene.input.MouseButton;
 import javafx.scene.input.TransferMode;
 import javafx.scene.layout.BorderPane;
-import javafx.scene.layout.HeaderBar;
+import javafx.stage.FileChooser;
+import javafx.stage.FileChooser.ExtensionFilter;
 import javafx.stage.Stage;
-import javafx.stage.StageStyle;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import sh.adelessfox.psarc.archive.Archive;
@@ -39,6 +41,11 @@ import static java.nio.file.StandardOpenOption.*;
 
 public class Main extends Application {
     private static final Logger log = LoggerFactory.getLogger(Main.class);
+    private static final String TITLE = "PSARC Explorer";
+
+    private final ObjectProperty<Path> path = new SimpleObjectProperty<>(this, "path");
+    private final ObjectProperty<Archive<?, ?>> archive = new SimpleObjectProperty<>(this, "archive");
+    private Stage stage;
 
     public static void main(String[] args) {
         Application.setUserAgentStylesheet(new PrimerLight().getUserAgentStylesheet());
@@ -46,48 +53,104 @@ public class Main extends Application {
     }
 
     public void start(Stage stage) {
-        Path path = Path.of("D:/PlayStation Games/Until Dawn TEST70002/USRDIR/data_ps3.psarc");
-        PsarcArchive archive;
-
-        try {
-            archive = new PsarcArchive(path, ByteOrder.BIG_ENDIAN);
-        } catch (IOException e) {
-            throw new UncheckedIOException(e);
-        }
+        this.stage = stage;
 
         var root = new BorderPane();
-        root.setTop(buildMenuBar());
-        root.setCenter(buildTreeTableView(archive));
+        root.setTop(buildToolBar());
+        root.setCenter(buildTreeTableView());
+        root.setBottom(buildStatusBar());
 
         var scene = new Scene(root);
         scene.getStylesheets().add(getClass().getResource("/styles.css").toExternalForm());
 
-        stage.setTitle("PSARC Explorer - " + path);
         stage.setScene(scene);
         stage.setWidth(750);
         stage.setHeight(720);
         stage.show();
+
+        stage.titleProperty().bind(
+            Bindings.when(path.isNotNull())
+                .then(Bindings.format("%s - %s", TITLE, path))
+                .otherwise(TITLE)
+        );
     }
 
-    private static MenuBar buildMenuBar() {
-        Menu fileMenu = new Menu("_File");
-        Menu helpMenu = new Menu("_Help");
-
-        MenuBar menuBar = new MenuBar();
-        menuBar.getMenus().addAll(fileMenu, helpMenu);
-
-        return menuBar;
+    public void setPath(Path path) {
+        this.path.set(path);
     }
 
-    private static <K extends AssetId, V extends Asset<K>> TreeTableView<ArchiveStructure<V>> buildTreeTableView(Archive<K, V> archive) {
-        var structure = ArchiveStructure.of(archive);
+    public void setArchive(Archive<?, ?> archive) {
+        this.archive.set(archive);
+    }
 
+    private void chooseArchive() {
+        FileChooser chooser = new FileChooser();
+        chooser.getExtensionFilters().add(new ExtensionFilter("PlayStation Archive", "*.psarc"));
+        chooser.setTitle("Choose archive to load");
+
+        File file = chooser.showOpenDialog(stage);
+        if (file != null) {
+            loadArchive(file.toPath());
+        }
+    }
+
+    private void loadArchive(Path path) {
+        try {
+            setArchive(new PsarcArchive(path, ByteOrder.BIG_ENDIAN));
+            setPath(path);
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+    }
+
+    private ToolBar buildToolBar() {
+        Button openButton = new Button("_Open\u2026", Fugue.getImageView("folder-open-document"));
+        openButton.setOnAction(_ -> chooseArchive());
+
+        return new ToolBar(openButton);
+    }
+
+    private StatusBar buildStatusBar() {
+        StatusBar statusBar = new StatusBar();
+
+        archive.addListener((_, _, newValue) -> {
+            if (newValue == null) {
+                statusBar.setVisible(false);
+                return;
+            }
+
+            long count = 0;
+            long size = 0;
+
+            for (Asset<?> asset : newValue.getAll()) {
+                count++;
+                size += asset.size();
+            }
+
+            statusBar.setVisible(true);
+            statusBar.setTotalFiles(count);
+            statusBar.setTotalSize(size);
+        });
+
+        return statusBar;
+    }
+
+    private <K extends AssetId, V extends Asset<K>> TreeTableView<ArchiveStructure<V>> buildTreeTableView() {
         var view = new TreeTableView<ArchiveStructure<V>>();
         view.getStyleClass().addAll(Styles.DENSE, Tweaks.EDGE_TO_EDGE);
-        view.setRoot(new StructuredTreeItem<>(structure));
         view.setShowRoot(false);
         view.setColumnResizePolicy(TreeTableView.CONSTRAINED_RESIZE_POLICY_FLEX_LAST_COLUMN);
         view.getColumns().setAll(buildTreeTableColumns());
+
+        archive.addListener((_, _, newValue) -> {
+            if (newValue == null) {
+                view.setRoot(null);
+            } else {
+                @SuppressWarnings("unchecked")
+                Archive<?, V> archive = (Archive<?, V>) newValue;
+                view.setRoot(new StructuredTreeItem<>(ArchiveStructure.of(archive)));
+            }
+        });
 
         // Drag & drop
         view.setOnDragDetected(event -> {
@@ -97,6 +160,9 @@ public class Main extends Application {
             }
 
             File result;
+
+            @SuppressWarnings("unchecked")
+            Archive<K, V> archive = (Archive<K, V>) this.archive.get();
 
             try {
                 result = extractToTemporaryFile(archive, file.asset).toFile();
@@ -120,6 +186,9 @@ public class Main extends Application {
             if (!(item.getValue() instanceof ArchiveStructure.File<V> file)) {
                 return;
             }
+
+            @SuppressWarnings("unchecked")
+            Archive<K, V> archive = (Archive<K, V>) this.archive.get();
 
             try {
                 Desktop.getDesktop().open(extractToTemporaryFile(archive, file.asset).toFile());
