@@ -28,6 +28,7 @@ import sh.adelessfox.psarc.archive.Asset;
 import sh.adelessfox.psarc.archive.AssetId;
 import sh.adelessfox.psarc.archive.PsarcArchive;
 import sh.adelessfox.psarc.ui.StructuredTreeItem;
+import sh.adelessfox.psarc.util.Filenames;
 import sh.adelessfox.psarc.util.Fugue;
 import sh.adelessfox.psarc.util.Mica;
 
@@ -46,6 +47,7 @@ import static java.nio.file.StandardOpenOption.*;
 public class Main extends Application {
     private static final Logger log = LoggerFactory.getLogger(Main.class);
     private static final String TITLE = "PSARC Explorer";
+    private static final String STYLE_MICA = "mica";
 
     private final ObjectProperty<Path> path = new SimpleObjectProperty<>(this, "path");
     private final ObjectProperty<Archive<?, ?>> archive = new SimpleObjectProperty<>(this, "archive");
@@ -80,7 +82,11 @@ public class Main extends Application {
                 .otherwise(TITLE)
         );
 
-        Mica.install(stage);
+        try {
+            Mica.install(stage);
+        } catch (Exception e) {
+            log.error("Unable to install Mica", e);
+        }
     }
 
     public void setPath(Path path) {
@@ -119,16 +125,19 @@ public class Main extends Application {
 
     private ToolBar buildToolBar() {
         Button openButton = new Button("_Open\u2026", Fugue.getImageView("folder-open-document"));
+        openButton.setTooltip(new Tooltip("Open an archive"));
         openButton.setOnAction(_ -> chooseArchive());
 
         Button extractButton = new Button("_Extract\u2026", Fugue.getImageView("folder-export"));
+        extractButton.setTooltip(new Tooltip("Extract all files"));
         extractButton.setOnAction(_ -> extractArchive());
+        extractButton.disableProperty().bind(archive.isNull());
 
         Button aboutButton = new Button("About", Fugue.getImageView("question-white"));
         aboutButton.setOnAction(_ -> showAboutDialog());
 
         ToolBar toolBar = new ToolBar(openButton, extractButton, new Spacer(), aboutButton);
-        toolBar.getStyleClass().add("mica");
+        toolBar.getStyleClass().add(STYLE_MICA);
 
         return toolBar;
     }
@@ -176,7 +185,6 @@ public class Main extends Application {
             }
         });
 
-        // Drag & drop
         view.setOnDragDetected(event -> {
             var item = view.getSelectionModel().getSelectedItem();
             if (!(item.getValue() instanceof ArchiveStructure.File<V> file)) {
@@ -199,7 +207,25 @@ public class Main extends Application {
             event.consume();
         });
 
-        // Double-click
+        view.setOnDragOver(event -> {
+            var dragboard = event.getDragboard();
+            if (dragboard.hasFiles() && dragboard.getFiles().size() == 1) {
+                var path = dragboard.getFiles().getFirst().toPath();
+                var extension = Filenames.getExtension(path);
+                if (extension.equalsIgnoreCase("psarc")) {
+                    event.acceptTransferModes(TransferMode.COPY);
+                }
+            }
+            event.consume();
+        });
+
+        view.setOnDragDropped(event -> {
+            var dragboard = event.getDragboard();
+            var path = dragboard.getFiles().getFirst().toPath();
+            loadArchive(path);
+            event.consume();
+        });
+
         view.setOnMouseClicked(event -> {
             if (event.getButton() != MouseButton.PRIMARY || event.getClickCount() % 2 != 0) {
                 return;
