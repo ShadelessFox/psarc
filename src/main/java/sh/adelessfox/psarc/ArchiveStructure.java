@@ -55,7 +55,7 @@ sealed abstract class ArchiveStructure<T extends Asset<?>> implements TreeStruct
         }
 
         private static String toDisplaySize(int size) {
-            var exp = (int) (Math.log10(size) / Math.log10(1024)) - 1;
+            var exp = (int) (Math.log10(size) / Math.log10(1024));
             var rem = (double) size / (1L << 10 * exp);
             return FORMAT.format(new Object[]{rem, exp});
         }
