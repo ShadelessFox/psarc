@@ -51,6 +51,8 @@
                     <mainClass>sh.adelessfox.psarc.Main</mainClass>
                     <options>
                         <option>--enable-native-access=javafx.graphics</option>
+                        <option>--add-opens=javafx.graphics/javafx.stage=psarc.app</option>
+                        <option>--add-opens=javafx.graphics/com.sun.javafx.tk=psarc.app</option>
                         <option>-Dprism.forceUploadingPainter=true</option>
                     </options>
                 </configuration>
@@ -104,6 +106,8 @@
                     </jLinkOptions>
                     <javaOptions>
                         <javaOption>--enable-native-access=javafx.graphics</javaOption>
+                        <javaOption>--add-opens=javafx.graphics/javafx.stage=psarc.app</javaOption>
+                        <javaOption>--add-opens=javafx.graphics/com.sun.javafx.tk=psarc.app</javaOption>
                         <javaOption>-Dprism.forceUploadingPainter=true</javaOption>
                     </javaOptions>
                     <module>psarc.app/sh.adelessfox.psarc.Main</module>
