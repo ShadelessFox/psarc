@@ -6,12 +6,13 @@
   -color-base-2-mica: rgba(208, 215, 222, 0.5);
 }
 
-.tree-table-view.dense > .column-header-background .column-header {
-  -fx-size: 28px;
+.button,
+.split-menu-button > .label {
+  -fx-padding: 6px 8px 6px 8px;
 }
 
-.tree-table-view.dense .tree-table-row-cell > .tree-disclosure-node {
-  -fx-padding: 0 0.5em 0 0.5em;
+.split-menu-button > .arrow-button {
+  -fx-padding: 6px 10px 6px 8px;
 }
 
 .status-bar {
@@ -22,24 +23,56 @@
   -fx-padding: 4px 12px 4px 12px;
 }
 
-.tool-bar.mica > .container > .button {
-  -fx-background-color: transparent;
-  -fx-padding: 6px 8px 6px 8px;
+.status-bar.mica {
+  -fx-border-color: -color-bg-inset;
 }
 
-.tool-bar.mica > .container > .button:hover {
+.tool-bar.mica > .container > .button,
+.tool-bar.mica > .container > .split-menu-button > .label {
+  -fx-background-color: transparent;
+}
+
+.tool-bar.mica > .container > .button:hover,
+.tool-bar.mica > .container > .split-menu-button:hover {
   -fx-background-color: -color-base-1-mica, -color-base-2-mica;
   -fx-opacity: 1;
 }
 
-.tree-table-view.mica > .column-header-background {
-  -fx-background-color: transparent;
+.tool-bar.mica > .container > .separator {
+  -color-separator: -color-bg-inset;
 }
 
+.tool-bar.mica > .container > .split-menu-button,
+.tool-bar.mica > .container > .split-menu-button:hover > .arrow-button {
+    -fx-background-color: transparent;
+    -fx-opacity: 1;
+}
+
+.tool-bar.mica > .container > .split-menu-button:hover > .arrow-button {
+    -fx-border-color: -color-button-fg;
+}
+
+.tool-bar.mica > .container > .split-menu-button:hover > .arrow-button > .arrow {
+  -fx-background-color: -color-button-fg;
+}
+
+.tool-bar.mica > .container > .split-menu-button > .arrow-button:hover > .arrow {
+    -fx-background-color: -color-fg-subtle;
+}
+
+.tree-table-view.dense > .column-header-background .column-header {
+  -fx-size: 28px;
+}
+
+.tree-table-view.dense .tree-table-row-cell > .tree-disclosure-node {
+  -fx-padding: 0 0.5em 0 0.5em;
+}
+
+.tree-table-view.mica > .column-header-background,
 .tree-table-view.mica .tree-table-row-cell {
   -fx-background-color: transparent;
 }
 
 .mica {
-    -fx-background-color: transparent;
+  -fx-background-color: transparent;
 }

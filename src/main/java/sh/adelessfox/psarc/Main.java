@@ -11,10 +11,8 @@ import javafx.beans.property.SimpleObjectProperty;
 import javafx.scene.Scene;
 import javafx.scene.control.*;
 import javafx.scene.control.Button;
-import javafx.scene.input.DataFormat;
-import javafx.scene.input.Dragboard;
-import javafx.scene.input.MouseButton;
-import javafx.scene.input.TransferMode;
+import javafx.scene.control.MenuItem;
+import javafx.scene.input.*;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.paint.Color;
 import javafx.stage.FileChooser;
@@ -27,9 +25,12 @@ import sh.adelessfox.psarc.archive.Archive;
 import sh.adelessfox.psarc.archive.Asset;
 import sh.adelessfox.psarc.archive.AssetId;
 import sh.adelessfox.psarc.archive.PsarcArchive;
+import sh.adelessfox.psarc.settings.Settings;
+import sh.adelessfox.psarc.settings.SettingsManager;
 import sh.adelessfox.psarc.ui.StructuredTreeItem;
 import sh.adelessfox.psarc.util.Filenames;
 import sh.adelessfox.psarc.util.Fugue;
+import sh.adelessfox.psarc.util.FxUtils;
 import sh.adelessfox.psarc.util.Mica;
 
 import java.awt.*;
@@ -39,6 +40,7 @@ import java.io.UncheckedIOException;
 import java.nio.ByteOrder;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -51,7 +53,9 @@ public class Main extends Application {
 
     private final ObjectProperty<Path> path = new SimpleObjectProperty<>(this, "path");
     private final ObjectProperty<Archive<?, ?>> archive = new SimpleObjectProperty<>(this, "archive");
+
     private Stage stage;
+    private Settings settings;
 
     public static void main(String[] args) {
         Application.setUserAgentStylesheet(new PrimerLight().getUserAgentStylesheet());
@@ -60,6 +64,7 @@ public class Main extends Application {
 
     public void start(Stage stage) {
         this.stage = stage;
+        this.settings = new SettingsManager("PsarcViewer").get();
 
         var root = new BorderPane();
         root.getStyleClass().add("mica");
@@ -87,6 +92,9 @@ public class Main extends Application {
         } catch (Exception e) {
             log.error("Unable to install Mica", e);
         }
+
+        FxUtils.installDevTools(stage, this, KeyCombination.keyCombination("Shift+Ctrl+Alt+X"));
+        FxUtils.installStylesheetHotReload(scene, scene.getStylesheets().getFirst());
     }
 
     public void setPath(Path path) {
@@ -97,21 +105,34 @@ public class Main extends Application {
         this.archive.set(archive);
     }
 
-    private void chooseArchive() {
-        FileChooser chooser = new FileChooser();
-        chooser.getExtensionFilters().add(new ExtensionFilter("PlayStation Archive", "*.psarc"));
-        chooser.setTitle("Choose archive to load");
+    public void addRecentPath(Path path) {
+        var recentPaths = settings.recentPaths().compute(ArrayList::new);
+        recentPaths.remove(path);
+        recentPaths.addFirst(path);
+    }
 
-        File file = chooser.showOpenDialog(stage);
+    private void chooseArchive() {
+        var chooser = new FileChooser();
+        chooser.setTitle("Choose archive to load");
+        chooser.setInitialDirectory(settings.lastDirectory().map(Path::toFile).orElse(null));
+        chooser.getExtensionFilters().add(new ExtensionFilter("PlayStation Archive", "*.psarc"));
+
+        var file = chooser.showOpenDialog(stage);
         if (file != null) {
-            loadArchive(file.toPath());
+            var path = file.toPath();
+            settings.lastDirectory().set(path.getParent());
+            loadArchive(path);
         }
     }
 
     private void loadArchive(Path path) {
+        if (path.equals(this.path.get())) {
+            return;
+        }
         try {
             setArchive(new PsarcArchive(path, ByteOrder.BIG_ENDIAN));
             setPath(path);
+            addRecentPath(path);
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }
@@ -124,9 +145,20 @@ public class Main extends Application {
     }
 
     private ToolBar buildToolBar() {
-        Button openButton = new Button("_Open\u2026", Fugue.getImageView("folder-open-document"));
+        SplitMenuButton openButton = new SplitMenuButton("_Open\u2026", Fugue.getImageView("folder-open-document"));
         openButton.setTooltip(new Tooltip("Open an archive"));
         openButton.setOnAction(_ -> chooseArchive());
+        openButton.setOnShowing(_ -> {
+            List<MenuItem> items = new ArrayList<>();
+            settings.recentPaths().ifPresent(paths -> {
+                for (Path path : paths) {
+                    MenuItem item = new MenuItem(path.toString());
+                    item.setOnAction(_ -> loadArchive(path));
+                    items.add(item);
+                }
+            });
+            openButton.getItems().setAll(items);
+        });
 
         Button extractButton = new Button("_Extract\u2026", Fugue.getImageView("folder-export"));
         extractButton.setTooltip(new Tooltip("Extract all files"));

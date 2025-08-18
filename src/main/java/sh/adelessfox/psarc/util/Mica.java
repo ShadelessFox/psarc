@@ -52,7 +52,7 @@ public final class Mica {
 
         var modern = getBuildNumber().orElse(0) >= WINDOWS_11_22H2;
         int attr = modern ? Dwmapi.DWMWA_SYSTEMBACKDROP_TYPE : Dwmapi.DWMWA_MICA_EFFECT;
-        int value = modern ? (enable ? Dwmapi.DWMSBT_MAINWINDOW : Dwmapi.DWMSBT_AUTO) : (enable ? 1 : 0);
+        int value = modern ? (enable ? Dwmapi.DWMSBT_TABBEDWINDOW : Dwmapi.DWMSBT_AUTO) : (enable ? 1 : 0);
 
         try (Arena arena = Arena.ofConfined()) {
             var hwnd = MemorySegment.ofAddress(handle);
@@ -126,6 +126,7 @@ public final class Mica {
 
         static final int DWMSBT_AUTO = 0;
         static final int DWMSBT_MAINWINDOW = 2;
+        static final int DWMSBT_TABBEDWINDOW = 4;
 
         static {
             var linker = Linker.nativeLinker();
