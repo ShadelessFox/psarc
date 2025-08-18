@@ -46,8 +46,8 @@ import java.util.Map;
 
 import static java.nio.file.StandardOpenOption.*;
 
-public class Main extends Application {
-    private static final Logger log = LoggerFactory.getLogger(Main.class);
+public class App extends Application {
+    private static final Logger log = LoggerFactory.getLogger(App.class);
     private static final String TITLE = "PSARC Explorer";
     private static final String STYLE_MICA = "mica";
 
@@ -65,7 +65,7 @@ public class Main extends Application {
     public void start(Stage stage) {
         this.stage = stage;
 
-        var component = DaggerMainComponent.create();
+        var component = DaggerAppComponent.create();
         this.settings = component.settings();
 
         var root = new BorderPane();

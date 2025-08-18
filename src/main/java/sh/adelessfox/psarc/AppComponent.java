@@ -7,6 +7,6 @@ import sh.adelessfox.psarc.settings.SettingsModule;
 
 @Singleton
 @Component(modules = SettingsModule.class)
-interface MainComponent {
+interface AppComponent {
     Settings settings();
 }
