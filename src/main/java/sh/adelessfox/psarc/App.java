@@ -164,7 +164,18 @@ public class App extends Application {
                     item.setOnAction(_ -> loadArchive(path));
                     items.add(item);
                 }
+                if (!paths.isEmpty()) {
+                    MenuItem item = new MenuItem("Clear recent file list");
+                    item.setOnAction(_ -> settings.recentPaths().set(null));
+                    items.add(new SeparatorMenuItem());
+                    items.add(item);
+                }
             });
+            if (items.isEmpty()) {
+                MenuItem item = new MenuItem("No recent files");
+                item.setDisable(true);
+                items.add(item);
+            }
             openButton.getItems().setAll(items);
         });
 
