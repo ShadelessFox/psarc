@@ -48,7 +48,7 @@ import static java.nio.file.StandardOpenOption.*;
 
 public class App extends Application {
     private static final Logger log = LoggerFactory.getLogger(App.class);
-    private static final String TITLE = "PSARC Explorer";
+    private static final String TITLE = "PSARC Viewer";
     private static final String STYLE_MICA = "mica";
 
     private final ObjectProperty<Path> path = new SimpleObjectProperty<>(this, "path");
@@ -144,6 +144,12 @@ public class App extends Application {
     }
 
     private void showAboutDialog() {
+        Alert alert = new Alert(Alert.AlertType.INFORMATION);
+        alert.setTitle("About");
+        alert.setHeaderText(null);
+        alert.setContentText("A viewer for PlayStation Archive (PSARC) files.");
+        alert.initOwner(stage);
+        alert.show();
     }
 
     private ToolBar buildToolBar() {
