@@ -26,7 +26,7 @@ import sh.adelessfox.psarc.archive.Asset;
 import sh.adelessfox.psarc.archive.AssetId;
 import sh.adelessfox.psarc.archive.PsarcArchive;
 import sh.adelessfox.psarc.settings.Settings;
-import sh.adelessfox.psarc.settings.SettingsManager;
+import sh.adelessfox.psarc.ui.StatusBar;
 import sh.adelessfox.psarc.ui.StructuredTreeItem;
 import sh.adelessfox.psarc.util.Filenames;
 import sh.adelessfox.psarc.util.Fugue;
@@ -64,7 +64,9 @@ public class Main extends Application {
 
     public void start(Stage stage) {
         this.stage = stage;
-        this.settings = new SettingsManager("PsarcViewer").get();
+
+        var component = DaggerMainComponent.create();
+        this.settings = component.settings();
 
         var root = new BorderPane();
         root.getStyleClass().add("mica");

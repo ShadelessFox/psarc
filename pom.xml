@@ -55,7 +55,11 @@
                 </exclusion>
             </exclusions>
         </dependency>
-
+        <dependency>
+            <groupId>io.github.jbock-java</groupId>
+            <artifactId>dapper</artifactId>
+            <version>2.41.2</version>
+        </dependency>
     </dependencies>
 
     <build>
@@ -72,6 +76,19 @@
                         <option>--add-opens=javafx.graphics/com.sun.javafx.tk=psarc.app</option>
                         <option>-Dprism.forceUploadingPainter=true</option>
                     </options>
+                </configuration>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <configuration>
+                    <annotationProcessorPaths>
+                        <path>
+                            <groupId>io.github.jbock-java</groupId>
+                            <artifactId>dapper-compiler</artifactId>
+                            <version>2.41.2</version>
+                        </path>
+                    </annotationProcessorPaths>
                 </configuration>
             </plugin>
             <plugin>

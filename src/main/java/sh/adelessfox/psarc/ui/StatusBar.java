@@ -1,4 +1,4 @@
-package sh.adelessfox.psarc;
+package sh.adelessfox.psarc.ui;
 
 import javafx.beans.property.LongProperty;
 import javafx.beans.property.SimpleLongProperty;
@@ -8,7 +8,7 @@ import javafx.scene.control.Separator;
 import javafx.scene.control.ToolBar;
 import sh.adelessfox.psarc.util.Formatters;
 
-final class StatusBar extends ToolBar {
+public final class StatusBar extends ToolBar {
     private final LongProperty totalFiles = new SimpleLongProperty(this, "totalFiles");
     private final LongProperty totalSize = new SimpleLongProperty(this, "totalSize");
 
