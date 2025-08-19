@@ -23,10 +23,6 @@
   -fx-padding: 4px 12px 4px 12px;
 }
 
-.status-bar.mica {
-  -fx-border-color: -color-bg-inset;
-}
-
 .tool-bar.mica > .container > .button,
 .tool-bar.mica > .container > .split-menu-button > .label {
   -fx-background-color: transparent;

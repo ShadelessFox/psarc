@@ -1,15 +1,15 @@
 package sh.adelessfox.psarc.util;
 
+import javafx.scene.Node;
 import javafx.stage.Window;
 
 import java.lang.foreign.*;
 import java.lang.invoke.MethodHandle;
 import java.lang.reflect.Method;
+import java.util.Optional;
 import java.util.OptionalInt;
-import java.util.OptionalLong;
 
-import static java.lang.foreign.ValueLayout.ADDRESS;
-import static java.lang.foreign.ValueLayout.JAVA_INT;
+import static java.lang.foreign.ValueLayout.*;
 
 /**
  * A class that enables Mica material for a JavaFX window.
@@ -22,7 +22,7 @@ public final class Mica {
     private static final Method Window_getPeer;
     private static final Method TKStage_getRawHandle;
 
-    private static final int WINDOWS_11_22H2 = 22621;
+    private static final String STYLE_MICA = "mica";
 
     static {
         try {
@@ -39,6 +39,10 @@ public final class Mica {
     private Mica() {
     }
 
+    public static boolean isMicaSupported() {
+        return OperatingSystem.isWindows() && isWin11();
+    }
+
     public static void install(Window window) {
         setEnabled(window, true);
     }
@@ -47,32 +51,54 @@ public final class Mica {
         setEnabled(window, false);
     }
 
-    private static void setEnabled(Window window, boolean enable) {
-        long handle = getWindowHandle(window).orElseThrow(() -> new IllegalStateException("Window peer is not available"));
+    public static void installStyle(Node node) {
+        if (isMicaSupported() && !node.getStyleClass().contains(STYLE_MICA)) {
+            node.getStyleClass().add(STYLE_MICA);
+        }
+    }
 
-        var modern = getBuildNumber().orElse(0) >= WINDOWS_11_22H2;
-        int attr = modern ? Dwmapi.DWMWA_SYSTEMBACKDROP_TYPE : Dwmapi.DWMWA_MICA_EFFECT;
-        int value = modern ? (enable ? Dwmapi.DWMSBT_TABBEDWINDOW : Dwmapi.DWMSBT_AUTO) : (enable ? 1 : 0);
+    public static void uninstallStyle(Node node) {
+        if (isMicaSupported()) {
+            node.getStyleClass().remove(STYLE_MICA);
+        }
+    }
+
+    private static void setEnabled(Window window, boolean enable) {
+        if (!isMicaSupported()) {
+            throw new UnsupportedOperationException("Mica is not supported on the current platform");
+        }
+
+        var hwnd = getWindowHandle(window)
+            .orElseThrow(() -> new IllegalStateException("Window peer is not available"));
+
+        int attr;
+        int value;
+
+        if (isWin11_22H2()) {
+            attr = Dwmapi.DWMWA_SYSTEMBACKDROP_TYPE;
+            value = enable ? Dwmapi.DWMSBT_TABBEDWINDOW : Dwmapi.DWMSBT_DISABLE;
+        } else {
+            attr = Dwmapi.DWMWA_MICA_EFFECT;
+            value = enable ? Dwmapi.DWMSBT_MAINWINDOW : 0;
+        }
 
         try (Arena arena = Arena.ofConfined()) {
-            var hwnd = MemorySegment.ofAddress(handle);
-            var data = arena.allocateFrom(JAVA_INT, value);
-
-            var result = Dwmapi.DwmSetWindowAttribute(hwnd, attr, data, (int) data.byteSize());
+            var buffer = arena.allocateFrom(JAVA_INT, value);
+            var result = Dwmapi.DwmSetWindowAttribute(hwnd, attr, buffer, (int) buffer.byteSize());
             if (result < 0) {
                 throw new IllegalStateException("Failed to set DWM attribute: " + result);
             }
         }
     }
 
-    private static OptionalLong getWindowHandle(Window window) {
+    private static Optional<MemorySegment> getWindowHandle(Window window) {
         try {
             var peer = Window_getPeer.invoke(window);
             if (peer == null) {
-                return OptionalLong.empty();
+                return Optional.empty();
             }
-            var handle = TKStage_getRawHandle.invoke(peer);
-            return OptionalLong.of((long) handle);
+            var handle = (long) TKStage_getRawHandle.invoke(peer);
+            return Optional.of(MemorySegment.ofAddress(handle));
         } catch (ReflectiveOperationException e) {
             throw new IllegalStateException(e);
         }
@@ -93,6 +119,14 @@ public final class Mica {
         }
 
         return OptionalInt.empty();
+    }
+
+    private static boolean isWin11() {
+        return getBuildNumber().orElse(0) >= 22000;
+    }
+
+    private static boolean isWin11_22H2() {
+        return getBuildNumber().orElse(0) >= 22621;
     }
 
     private static final class Ntdll {
@@ -121,12 +155,15 @@ public final class Mica {
         private static final MethodHandle DwmSetWindowAttribute$MH;
 
         static final int DWMWA_USE_IMMERSIVE_DARK_MODE = 20;
+        static final int DWMWA_MICA_EFFECT = 1029;
         static final int DWMWA_SYSTEMBACKDROP_TYPE = 38;
-        static final int DWMWA_MICA_EFFECT = 1039;
 
-        static final int DWMSBT_AUTO = 0;
-        static final int DWMSBT_MAINWINDOW = 2;
-        static final int DWMSBT_TABBEDWINDOW = 4;
+        // DWM_SYSTEMBACKDROP_TYPE
+        static final int DWMSBT_AUTO = 0;            // Auto
+        static final int DWMSBT_DISABLE = 1;         // None
+        static final int DWMSBT_MAINWINDOW = 2;      // Mica
+        static final int DWMSBT_TRANSIENTWINDOW = 3; // Acrylic
+        static final int DWMSBT_TABBEDWINDOW = 4;    // Tabbed
 
         static {
             var linker = Linker.nativeLinker();

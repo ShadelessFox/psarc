@@ -49,7 +49,6 @@ import static java.nio.file.StandardOpenOption.*;
 public class App extends Application {
     private static final Logger log = LoggerFactory.getLogger(App.class);
     private static final String TITLE = "PSARC Viewer";
-    private static final String STYLE_MICA = "mica";
 
     private final ObjectProperty<Path> path = new SimpleObjectProperty<>(this, "path");
     private final ObjectProperty<Archive<?, ?>> archive = new SimpleObjectProperty<>(this, "archive");
@@ -69,10 +68,10 @@ public class App extends Application {
         this.settings = component.settings();
 
         var root = new BorderPane();
-        root.getStyleClass().add("mica");
         root.setTop(buildToolBar());
         root.setCenter(buildTreeTableView());
         root.setBottom(buildStatusBar());
+        Mica.installStyle(root);
 
         var scene = new Scene(root, Color.TRANSPARENT);
         scene.getStylesheets().add(getClass().getResource("/styles.css").toExternalForm());
@@ -89,10 +88,8 @@ public class App extends Application {
                 .otherwise(TITLE)
         );
 
-        try {
+        if (Mica.isMicaSupported()) {
             Mica.install(stage);
-        } catch (Exception e) {
-            log.error("Unable to install Mica", e);
         }
 
         FxUtils.installDevTools(stage, this, KeyCombination.keyCombination("Shift+Ctrl+Alt+X"));
@@ -149,7 +146,12 @@ public class App extends Application {
         alert.setHeaderText(null);
         alert.setContentText("A viewer for PlayStation Archive (PSARC) files.");
         alert.initOwner(stage);
+        alert.initStyle(StageStyle.UNIFIED);
         alert.show();
+
+        if (Mica.isMicaSupported()) {
+            Mica.install(stage);
+        }
     }
 
     private ToolBar buildToolBar() {
@@ -188,14 +190,13 @@ public class App extends Application {
         aboutButton.setOnAction(_ -> showAboutDialog());
 
         ToolBar toolBar = new ToolBar(openButton, extractButton, new Spacer(), aboutButton);
-        toolBar.getStyleClass().add(STYLE_MICA);
+        Mica.installStyle(toolBar);
 
         return toolBar;
     }
 
     private StatusBar buildStatusBar() {
         StatusBar statusBar = new StatusBar();
-        statusBar.getStyleClass().add("mica");
 
         archive.addListener((_, _, newValue) -> {
             if (newValue == null) {
