@@ -7,6 +7,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import sh.adelessfox.psarc.settings.gson.PathTypeAdapter;
 import sh.adelessfox.psarc.settings.gson.SettingAdapterFactory;
+import sh.adelessfox.psarc.util.OperatingSystem;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -58,7 +59,14 @@ public final class SettingsManager {
     }
 
     private Path determinePath() {
-        // NOTE: Currently only Windows is supported
-        return Path.of(System.getenv("LOCALAPPDATA"), identifier, "settings.json");
+        String userHome = System.getProperty("user.home");
+        if (userHome == null) {
+            throw new IllegalStateException("Unable to determine user home directory");
+        }
+        return switch (OperatingSystem.current()) {
+            case WINDOWS -> Path.of(userHome, "AppData", "Local", identifier, "settings.json");
+            case MACOS -> Path.of(userHome, "Library", "Application Support", identifier, "settings.json");
+            case LINUX -> Path.of(userHome, ".config", identifier, "settings.json");
+        };
     }
 }
