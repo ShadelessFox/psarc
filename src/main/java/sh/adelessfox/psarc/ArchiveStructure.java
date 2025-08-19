@@ -4,7 +4,7 @@ import sh.adelessfox.psarc.archive.Archive;
 import sh.adelessfox.psarc.archive.Asset;
 import sh.adelessfox.psarc.ui.TreeStructure;
 import sh.adelessfox.psarc.util.FilePath;
-import sh.adelessfox.psarc.util.Formatters;
+import sh.adelessfox.psarc.util.type.FileCount;
 
 import java.util.*;
 import java.util.stream.Collectors;
@@ -40,7 +40,7 @@ sealed abstract class ArchiveStructure<T extends Asset<?>> implements TreeStruct
         }
 
         static <T extends Asset<?>> File<T> of(FilePath path, T asset) {
-            return new File<>(path, asset, path.last(), Formatters.formatSize(asset.size()));
+            return new File<>(path, asset, path.last(), asset.size().toString());
         }
 
         @Override
@@ -60,11 +60,9 @@ sealed abstract class ArchiveStructure<T extends Asset<?>> implements TreeStruct
         }
 
         static <T extends Asset<?>> Folder<T> of(NavigableMap<FilePath, T> paths, Folder<T> parent, FilePath path) {
-            int children = (int) collectChildren(paths, path).count();
+            var children = FileCount.of(collectChildren(paths, path).count());
             var name = parent != null ? toDisplayName(parent, path) : "";
-            var size = Formatters.formatFiles(children);
-
-            return new Folder<>(paths, path, name, size);
+            return new Folder<>(paths, path, name, children.toString());
         }
 
         @Override

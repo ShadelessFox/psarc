@@ -10,9 +10,11 @@ module psarc.app {
     requires javafx.graphics;
     requires org.slf4j;
 
-    exports sh.adelessfox.psarc to javafx.graphics;
-    exports sh.adelessfox.psarc.ui to javafx.graphics;
     exports sh.adelessfox.psarc.archive;
+    exports sh.adelessfox.psarc.ui;
+    exports sh.adelessfox.psarc.util.type;
+    exports sh.adelessfox.psarc.util;
+    exports sh.adelessfox.psarc;
 
     opens sh.adelessfox.psarc.settings to com.google.gson;
 }

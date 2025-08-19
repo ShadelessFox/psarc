@@ -32,6 +32,8 @@ import sh.adelessfox.psarc.util.Filenames;
 import sh.adelessfox.psarc.util.Fugue;
 import sh.adelessfox.psarc.util.FxUtils;
 import sh.adelessfox.psarc.util.Mica;
+import sh.adelessfox.psarc.util.type.FileCount;
+import sh.adelessfox.psarc.util.type.FileSize;
 
 import java.awt.*;
 import java.io.File;
@@ -200,17 +202,17 @@ public class App extends Application {
 
         archive.addListener((_, _, newValue) -> {
             if (newValue == null) {
-                statusBar.setTotalFiles(0);
-                statusBar.setTotalSize(0);
+                statusBar.setTotalFiles(FileCount.zero());
+                statusBar.setTotalSize(FileSize.zero());
                 return;
             }
 
-            long count = 0;
-            long size = 0;
+            var count = FileCount.zero();
+            var size = FileSize.zero();
 
             for (Asset<?> asset : newValue.getAll()) {
-                count++;
-                size += asset.size();
+                count = count.increment();
+                size = size.add(asset.size());
             }
 
             statusBar.setTotalFiles(count);

@@ -1,5 +1,7 @@
 package sh.adelessfox.psarc.archive;
 
+import sh.adelessfox.psarc.util.type.FileSize;
+
 public record PsarcAsset(
     PsarcAssetId id,
     int blockOffset,
@@ -7,7 +9,7 @@ public record PsarcAsset(
     long fileOffset
 ) implements Asset<PsarcAssetId> {
     @Override
-    public int size() {
-        return Math.toIntExact(uncompressedSize);
+    public FileSize size() {
+        return FileSize.ofBytes(uncompressedSize);
     }
 }
