@@ -10,8 +10,8 @@ import sh.adelessfox.psarc.util.type.FileCount;
 import sh.adelessfox.psarc.util.type.FileSize;
 
 public final class StatusBar extends ToolBar {
-    private final ObjectProperty<FileCount> totalFiles = new SimpleObjectProperty<>(this, "totalFiles", FileCount.zero());
-    private final ObjectProperty<FileSize> totalSize = new SimpleObjectProperty<>(this, "totalSize", FileSize.zero());
+    private final ObjectProperty<FileCount> totalFiles = new SimpleObjectProperty<>(this, "totalFiles", FileCount.ZERO);
+    private final ObjectProperty<FileSize> totalSize = new SimpleObjectProperty<>(this, "totalSize", FileSize.ZERO);
 
     public StatusBar() {
         Label filesLabel = new Label();

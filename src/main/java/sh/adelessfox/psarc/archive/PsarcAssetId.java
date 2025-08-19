@@ -1,6 +1,6 @@
 package sh.adelessfox.psarc.archive;
 
-import sh.adelessfox.psarc.util.FilePath;
+import sh.adelessfox.psarc.util.type.FilePath;
 
 public record PsarcAssetId(String name) implements AssetId {
     public static PsarcAssetId of(String name) {
@@ -14,6 +14,6 @@ public record PsarcAssetId(String name) implements AssetId {
 
     @Override
     public FilePath toFilePath() {
-        return FilePath.of(name.split("/"));
+        return FilePath.of(name, "/");
     }
 }

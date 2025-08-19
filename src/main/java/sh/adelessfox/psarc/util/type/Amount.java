@@ -1,39 +1,25 @@
 package sh.adelessfox.psarc.util.type;
 
 public sealed interface Amount<T extends Amount<T>> extends Comparable<T> {
-    T add(T other);
+    T addTo(T amount);
 
-    T subtract(T other);
-
-    T increment();
-
-    T decrement();
+    T subtractFrom(T amount);
 
     non-sealed abstract class OfLong<T extends OfLong<T>> implements Amount<T> {
-        final long value;
+        protected final long value;
 
         public OfLong(long value) {
             this.value = value;
         }
 
         @Override
-        public T add(T other) {
-            return newInstance(value + other.value);
+        public T addTo(T amount) {
+            return newInstance(value + amount.value);
         }
 
         @Override
-        public T subtract(T other) {
-            return newInstance(value - other.value);
-        }
-
-        @Override
-        public T increment() {
-            return newInstance(value + 1);
-        }
-
-        @Override
-        public T decrement() {
-            return newInstance(value - 1);
+        public T subtractFrom(T amount) {
+            return newInstance(value - amount.value);
         }
 
         @Override

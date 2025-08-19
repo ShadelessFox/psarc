@@ -3,8 +3,8 @@ package sh.adelessfox.psarc;
 import sh.adelessfox.psarc.archive.Archive;
 import sh.adelessfox.psarc.archive.Asset;
 import sh.adelessfox.psarc.ui.TreeStructure;
-import sh.adelessfox.psarc.util.FilePath;
 import sh.adelessfox.psarc.util.type.FileCount;
+import sh.adelessfox.psarc.util.type.FilePath;
 
 import java.util.*;
 import java.util.stream.Collectors;
@@ -28,7 +28,7 @@ sealed abstract class ArchiveStructure<T extends Asset<?>> implements TreeStruct
         for (T asset : archive.getAll()) {
             paths.put(asset.id().toFilePath(), asset);
         }
-        return Folder.of(paths, null, FilePath.of());
+        return Folder.of(paths);
     }
 
     static final class File<T extends Asset<?>> extends ArchiveStructure<T> {
@@ -61,8 +61,12 @@ sealed abstract class ArchiveStructure<T extends Asset<?>> implements TreeStruct
 
         static <T extends Asset<?>> Folder<T> of(NavigableMap<FilePath, T> paths, Folder<T> parent, FilePath path) {
             var children = FileCount.of(collectChildren(paths, path).count());
-            var name = parent != null ? toDisplayName(parent, path) : "";
+            var name = toDisplayName(parent, path);
             return new Folder<>(paths, path, name, children.toString());
+        }
+
+        static <T extends Asset<?>> Folder<T> of(NavigableMap<FilePath, T> paths) {
+            return new Folder<>(paths, FilePath.of(), "", "");
         }
 
         @Override
@@ -94,7 +98,7 @@ sealed abstract class ArchiveStructure<T extends Asset<?>> implements TreeStruct
         }
 
         private static <T extends Asset<?>> Stream<PathWithAsset<T>> collectChildren(NavigableMap<FilePath, T> paths, FilePath path) {
-            var children = paths.subMap(path, true, path.concat("*"), false);
+            var children = paths.subMap(path, true, path.resolve(FilePath.any()), false);
             return Stream.concat(
                 collectFolders(children, path),
                 collectFiles(children, path)

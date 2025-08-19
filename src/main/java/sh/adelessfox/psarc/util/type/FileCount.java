@@ -3,14 +3,10 @@ package sh.adelessfox.psarc.util.type;
 import java.text.NumberFormat;
 
 public final class FileCount extends Amount.OfLong<FileCount> {
-    private static final FileCount zero = new FileCount(0);
+    public static final FileCount ZERO = new FileCount(0);
 
     private FileCount(long value) {
         super(value);
-    }
-
-    public static FileCount zero() {
-        return zero;
     }
 
     public static FileCount of(long count) {
@@ -18,7 +14,7 @@ public final class FileCount extends Amount.OfLong<FileCount> {
             throw new IllegalArgumentException("count must be positive: " + count);
         }
         if (count == 0) {
-            return zero;
+            return ZERO;
         }
         return new FileCount(count);
     }

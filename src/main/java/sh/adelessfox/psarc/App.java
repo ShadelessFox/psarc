@@ -44,6 +44,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.LongSummaryStatistics;
 import java.util.Map;
 
 import static java.nio.file.StandardOpenOption.*;
@@ -202,21 +203,17 @@ public class App extends Application {
 
         archive.addListener((_, _, newValue) -> {
             if (newValue == null) {
-                statusBar.setTotalFiles(FileCount.zero());
-                statusBar.setTotalSize(FileSize.zero());
+                statusBar.setTotalFiles(FileCount.ZERO);
+                statusBar.setTotalSize(FileSize.ZERO);
                 return;
             }
 
-            var count = FileCount.zero();
-            var size = FileSize.zero();
+            var statistics = newValue.getAll().stream()
+                .mapToLong(value -> value.size().toBytes())
+                .summaryStatistics();
 
-            for (Asset<?> asset : newValue.getAll()) {
-                count = count.increment();
-                size = size.add(asset.size());
-            }
-
-            statusBar.setTotalFiles(count);
-            statusBar.setTotalSize(size);
+            statusBar.setTotalFiles(FileCount.of(statistics.getCount()));
+            statusBar.setTotalSize(FileSize.ofBytes(statistics.getSum()));
         });
 
         return statusBar;

@@ -1,32 +1,24 @@
 package sh.adelessfox.psarc.util.type;
 
 public final class FileSize extends Amount.OfLong<FileSize> {
-    private static final FileSize zero = new FileSize(0);
+    public static final FileSize ZERO = new FileSize(0);
 
     private FileSize(long value) {
         super(value);
     }
 
-    public static FileSize zero() {
-        return zero;
-    }
-
-    public static FileSize ofBytes(long b) {
-        if (b < 0) {
-            throw new IllegalArgumentException("size must be positive: " + b);
+    public static FileSize ofBytes(long bytes) {
+        if (bytes < 0) {
+            throw new IllegalArgumentException("size must be positive: " + bytes);
         }
-        if (b == 0) {
-            return zero;
+        if (bytes == 0) {
+            return ZERO;
         }
-        return new FileSize(b);
+        return new FileSize(bytes);
     }
 
-    public static FileSize ofMegabytes(long mb) {
-        return ofBytes(mb * 1024);
-    }
-
-    public static FileSize ofGigabytes(long gb) {
-        return ofBytes(gb * 1024 * 1024);
+    public long toBytes() {
+        return value;
     }
 
     @Override
@@ -39,11 +31,11 @@ public final class FileSize extends Amount.OfLong<FileSize> {
         if (value < 1024) {
             return value + " B";
         } else if (value < 1024 * 1024) {
-            return String.format("%.2f kB", value / (1024.0));
+            return String.format("%.2f KiB", value / (1024.0));
         } else if (value < 1024 * 1024 * 1024) {
-            return String.format("%.2f mB", value / (1024.0 * 1024.0));
+            return String.format("%.2f MiB", value / (1024.0 * 1024.0));
         } else {
-            return String.format("%.2f gB", value / (1024.0 * 1024.0 * 1024.0));
+            return String.format("%.2f GiB", value / (1024.0 * 1024.0 * 1024.0));
         }
     }
 }
