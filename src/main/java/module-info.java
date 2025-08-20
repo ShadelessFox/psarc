@@ -5,6 +5,7 @@ module psarc.app {
     requires com.google.gson;
     requires dagger;
     requires devtoolsfx.gui;
+    requires info.picocli;
     requires java.desktop;
     requires javafx.controls;
     requires javafx.graphics;
@@ -17,4 +18,5 @@ module psarc.app {
     exports sh.adelessfox.psarc;
 
     opens sh.adelessfox.psarc.settings to com.google.gson;
+    opens sh.adelessfox.psarc.cli to info.picocli;
 }
