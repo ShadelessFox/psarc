@@ -1,6 +1,5 @@
 package sh.adelessfox.psarc;
 
-import atlantafx.base.theme.PrimerLight;
 import javafx.application.Application;
 import sh.adelessfox.psarc.cli.ApplicationCLI;
 

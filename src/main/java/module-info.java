@@ -7,6 +7,7 @@ module psarc.app {
     requires devtoolsfx.gui;
     requires info.picocli;
     requires java.desktop;
+    requires javafx.base;
     requires javafx.controls;
     requires javafx.graphics;
     requires org.slf4j;

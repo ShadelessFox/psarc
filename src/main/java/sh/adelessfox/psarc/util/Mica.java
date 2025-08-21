@@ -9,7 +9,8 @@ import java.lang.reflect.Method;
 import java.util.Optional;
 import java.util.OptionalInt;
 
-import static java.lang.foreign.ValueLayout.*;
+import static java.lang.foreign.ValueLayout.ADDRESS;
+import static java.lang.foreign.ValueLayout.JAVA_INT;
 
 /**
  * A class that enables Mica material for a JavaFX window.

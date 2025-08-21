@@ -16,11 +16,12 @@
 }
 
 .status-bar {
+  -fx-background-color: -color-base-0;
   -fx-border-color: -color-border-default;
   -fx-border-width: 1 0 0 0;
   -fx-border-style: solid;
-  -fx-alignment: CENTER_RIGHT;
-  -fx-padding: 4px 12px 4px 12px;
+  -fx-padding: 4px 12px 4px 6px;
+  -fx-spacing: 5;
 }
 
 .tool-bar.mica > .container > .button,
@@ -54,6 +55,11 @@
 
 .tool-bar.mica > .container > .split-menu-button > .arrow-button:hover > .arrow {
     -fx-background-color: -color-fg-subtle;
+}
+
+.tool-bar.mica > .container > .split-menu-button:disabled {
+  -fx-opacity: 0.4;
+  -fx-effect: none;
 }
 
 .tree-table-view.dense > .column-header-background .column-header {

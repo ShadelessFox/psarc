@@ -6,15 +6,19 @@ import atlantafx.base.theme.Styles;
 import atlantafx.base.theme.Tweaks;
 import javafx.application.Application;
 import javafx.beans.binding.Bindings;
-import javafx.beans.property.ObjectProperty;
-import javafx.beans.property.SimpleObjectProperty;
+import javafx.beans.property.*;
+import javafx.event.Event;
+import javafx.event.EventHandler;
+import javafx.scene.Cursor;
 import javafx.scene.Scene;
 import javafx.scene.control.*;
 import javafx.scene.control.Button;
 import javafx.scene.control.MenuItem;
+import javafx.scene.image.ImageView;
 import javafx.scene.input.*;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.paint.Color;
+import javafx.stage.DirectoryChooser;
 import javafx.stage.FileChooser;
 import javafx.stage.Stage;
 import javafx.stage.StageStyle;
@@ -25,6 +29,7 @@ import sh.adelessfox.psarc.archive.Asset;
 import sh.adelessfox.psarc.archive.AssetId;
 import sh.adelessfox.psarc.archive.PsarcArchive;
 import sh.adelessfox.psarc.settings.Settings;
+import sh.adelessfox.psarc.ui.ExportService;
 import sh.adelessfox.psarc.ui.StatusBar;
 import sh.adelessfox.psarc.ui.StructuredTreeItem;
 import sh.adelessfox.psarc.util.Filenames;
@@ -52,7 +57,10 @@ public final class AppWindow extends Application {
     private static final String TITLE = "PSARC Viewer";
 
     private final ObjectProperty<Path> path = new SimpleObjectProperty<>(this, "path");
-    private final ObjectProperty<Archive<?, ?>> archive = new SimpleObjectProperty<>(this, "archive");
+    private final ObjectProperty<PsarcArchive> archive = new SimpleObjectProperty<>(this, "archive");
+    private final BooleanProperty exporting = new SimpleBooleanProperty(this, "busy");
+    private final StringProperty status = new SimpleStringProperty(this, "status");
+    private final ObjectProperty<EventHandler<Event>> onCanceled = new SimpleObjectProperty<>(this, "onCanceled");
 
     private Stage stage;
     private Settings settings;
@@ -104,7 +112,7 @@ public final class AppWindow extends Application {
         this.path.set(path);
     }
 
-    public void setArchive(Archive<?, ?> archive) {
+    public void setArchive(PsarcArchive archive) {
         this.archive.set(archive);
     }
 
@@ -142,6 +150,25 @@ public final class AppWindow extends Application {
     }
 
     private void extractArchive() {
+        var chooser = new DirectoryChooser();
+        chooser.setTitle("Choose output directory");
+        chooser.setInitialDirectory(settings.lastDirectory().map(Path::toFile).orElse(null));
+
+        var directory = chooser.showDialog(stage);
+        if (directory == null) {
+            return;
+        }
+
+        exporting.set(false);
+
+        var archive = this.archive.get();
+
+        var service = new ExportService<>(directory.toPath(), archive, archive.getAll());
+        service.messageProperty().addListener((_, _, newValue) -> status.set("[%d/%d] %s".formatted((int) service.getWorkDone(), (int) service.getTotalWork(), newValue)));
+        service.runningProperty().addListener((_, _, newValue) -> exporting.set(newValue));
+        service.start();
+
+        onCanceled.set(_ -> service.cancel());
     }
 
     private void showAboutDialog() {
@@ -184,11 +211,12 @@ public final class AppWindow extends Application {
             }
             openButton.getItems().setAll(items);
         });
+        openButton.disableProperty().bind(exporting);
 
         Button extractButton = new Button("_Extract\u2026", Fugue.getImageView("folder-export"));
         extractButton.setTooltip(new Tooltip("Extract all files"));
         extractButton.setOnAction(_ -> extractArchive());
-        extractButton.disableProperty().bind(archive.isNull());
+        extractButton.disableProperty().bind(archive.isNull().or(exporting));
 
         Button aboutButton = new Button("About", Fugue.getImageView("question-white"));
         aboutButton.setOnAction(_ -> showAboutDialog());
@@ -200,7 +228,18 @@ public final class AppWindow extends Application {
     }
 
     private StatusBar buildStatusBar() {
+        ImageView stopButton = Fugue.getImageView("cross-white");
+        stopButton.setCursor(Cursor.HAND);
+        stopButton.setOnMouseClicked(e -> {
+            EventHandler<Event> onCanceled = this.onCanceled.get();
+            if (onCanceled != null) {
+                onCanceled.handle(e);
+            }
+        });
+
         StatusBar statusBar = new StatusBar();
+        statusBar.messageProperty().bind(Bindings.when(exporting).then(status).otherwise((String) null));
+        statusBar.graphicProperty().bind(Bindings.when(exporting).then(stopButton).otherwise((ImageView) null));
 
         archive.addListener((_, _, newValue) -> {
             if (newValue == null) {
