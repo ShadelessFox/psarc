@@ -15,11 +15,20 @@
   -fx-padding: 6px 10px 6px 8px;
 }
 
-.status-bar {
-  -fx-background-color: -color-base-0;
+.border-top {
   -fx-border-color: -color-border-default;
   -fx-border-width: 1 0 0 0;
   -fx-border-style: solid;
+}
+
+.border-bottom {
+  -fx-border-color: -color-border-default;
+  -fx-border-width: 0 0 1 0;
+  -fx-border-style: solid;
+}
+
+.status-bar {
+  -fx-background-color: -color-base-0;
   -fx-padding: 4px 12px 4px 6px;
   -fx-spacing: 5;
 }
@@ -68,11 +77,6 @@
 
 .tree-table-view.dense .tree-table-row-cell > .tree-disclosure-node {
   -fx-padding: 0 0.5em 0 0.5em;
-}
-
-.tree-table-view.mica > .column-header-background,
-.tree-table-view.mica .tree-table-row-cell {
-  -fx-background-color: transparent;
 }
 
 .mica {

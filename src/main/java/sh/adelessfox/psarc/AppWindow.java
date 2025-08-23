@@ -223,6 +223,7 @@ public final class AppWindow extends Application {
         aboutButton.setOnAction(_ -> showAboutDialog());
 
         ToolBar toolBar = new ToolBar(openButton, extractButton, new Spacer(), aboutButton);
+        toolBar.getStyleClass().add("border-bottom");
         Mica.installStyle(toolBar);
 
         return toolBar;
@@ -234,6 +235,7 @@ public final class AppWindow extends Application {
         stopButton.setOnMouseClicked(_ -> service.cancel());
 
         StatusBar statusBar = new StatusBar();
+        statusBar.getStyleClass().add("border-top");
         statusBar.messageProperty().bind(Bindings.when(exporting).then(status).otherwise((String) null));
         statusBar.graphicProperty().bind(Bindings.when(exporting).then(stopButton).otherwise((ImageView) null));
 
