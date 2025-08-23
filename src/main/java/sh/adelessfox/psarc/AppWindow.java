@@ -7,8 +7,6 @@ import atlantafx.base.theme.Tweaks;
 import javafx.application.Application;
 import javafx.beans.binding.Bindings;
 import javafx.beans.property.*;
-import javafx.event.Event;
-import javafx.event.EventHandler;
 import javafx.scene.Cursor;
 import javafx.scene.Scene;
 import javafx.scene.control.*;
@@ -29,7 +27,6 @@ import sh.adelessfox.psarc.archive.Asset;
 import sh.adelessfox.psarc.archive.AssetId;
 import sh.adelessfox.psarc.archive.PsarcArchive;
 import sh.adelessfox.psarc.settings.Settings;
-import sh.adelessfox.psarc.ui.ExportService;
 import sh.adelessfox.psarc.ui.StatusBar;
 import sh.adelessfox.psarc.ui.StructuredTreeItem;
 import sh.adelessfox.psarc.util.Filenames;
@@ -60,10 +57,10 @@ public final class AppWindow extends Application {
     private final ObjectProperty<PsarcArchive> archive = new SimpleObjectProperty<>(this, "archive");
     private final BooleanProperty exporting = new SimpleBooleanProperty(this, "busy");
     private final StringProperty status = new SimpleStringProperty(this, "status");
-    private final ObjectProperty<EventHandler<Event>> onCanceled = new SimpleObjectProperty<>(this, "onCanceled");
 
     private Stage stage;
     private Settings settings;
+    private ExportService service;
 
     public AppWindow() {
     }
@@ -78,6 +75,15 @@ public final class AppWindow extends Application {
 
         var component = DaggerAppComponent.create();
         this.settings = component.settings();
+        this.service = new ExportService();
+
+        exporting.bind(service.runningProperty());
+        status.bind(Bindings.format(
+            "[%d/%d] %s",
+            service.workDoneProperty().map(Number::intValue),
+            service.totalWorkProperty().map(Number::intValue),
+            service.messageProperty()
+        ));
 
         var root = new BorderPane();
         root.setTop(buildToolBar());
@@ -154,21 +160,16 @@ public final class AppWindow extends Application {
         chooser.setTitle("Choose output directory");
         chooser.setInitialDirectory(settings.lastDirectory().map(Path::toFile).orElse(null));
 
-        var directory = chooser.showDialog(stage);
-        if (directory == null) {
+        var path = chooser.showDialog(stage);
+        if (path == null) {
             return;
         }
 
-        exporting.set(false);
-
         var archive = this.archive.get();
-
-        var service = new ExportService<>(directory.toPath(), archive, archive.getAll());
-        service.messageProperty().addListener((_, _, newValue) -> status.set("[%d/%d] %s".formatted((int) service.getWorkDone(), (int) service.getTotalWork(), newValue)));
-        service.runningProperty().addListener((_, _, newValue) -> exporting.set(newValue));
-        service.start();
-
-        onCanceled.set(_ -> service.cancel());
+        service.setPath(path.toPath());
+        service.setArchive(archive);
+        service.setAssets(archive.getAll());
+        service.restart();
     }
 
     private void showAboutDialog() {
@@ -230,12 +231,7 @@ public final class AppWindow extends Application {
     private StatusBar buildStatusBar() {
         ImageView stopButton = Fugue.getImageView("cross-white");
         stopButton.setCursor(Cursor.HAND);
-        stopButton.setOnMouseClicked(e -> {
-            EventHandler<Event> onCanceled = this.onCanceled.get();
-            if (onCanceled != null) {
-                onCanceled.handle(e);
-            }
-        });
+        stopButton.setOnMouseClicked(_ -> service.cancel());
 
         StatusBar statusBar = new StatusBar();
         statusBar.messageProperty().bind(Bindings.when(exporting).then(status).otherwise((String) null));

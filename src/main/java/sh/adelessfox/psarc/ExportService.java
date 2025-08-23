@@ -1,38 +1,48 @@
-package sh.adelessfox.psarc.ui;
+package sh.adelessfox.psarc;
 
 import javafx.concurrent.Service;
 import javafx.concurrent.Task;
-import sh.adelessfox.psarc.archive.Archive;
-import sh.adelessfox.psarc.archive.Asset;
-import sh.adelessfox.psarc.archive.AssetId;
+import sh.adelessfox.psarc.archive.PsarcArchive;
+import sh.adelessfox.psarc.archive.PsarcAsset;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Collection;
+import java.util.Objects;
 
 import static java.nio.file.StandardOpenOption.*;
 
-public class ExportService<K extends AssetId, V extends Asset<K>> extends Service<Void> {
-    private final Path path;
-    private final Archive<K, V> archive;
-    private final Collection<V> assets;
-
-    public ExportService(Path path, Archive<K, V> archive, Collection<V> assets) {
-        this.path = path;
-        this.archive = archive;
-        this.assets = assets;
-    }
+final class ExportService extends Service<Void> {
+    private Path path;
+    private PsarcArchive archive;
+    private Collection<PsarcAsset> assets;
 
     @Override
     protected Task<Void> createTask() {
+        Objects.requireNonNull(path, "path");
+        Objects.requireNonNull(archive, "archive");
+        Objects.requireNonNull(assets, "assets");
+
         return new ExportTask();
+    }
+
+    public void setPath(Path path) {
+        this.path = path;
+    }
+
+    public void setArchive(PsarcArchive archive) {
+        this.archive = archive;
+    }
+
+    public void setAssets(Collection<PsarcAsset> assets) {
+        this.assets = assets;
     }
 
     private final class ExportTask extends Task<Void> {
         @Override
         protected Void call() throws Exception {
             int index = 0;
-            for (V asset : assets) {
+            for (PsarcAsset asset : assets) {
                 updateProgress(index, assets.size());
                 updateMessage("Extracting " + asset.id().fullName());
                 exportAsset(asset);
@@ -45,7 +55,7 @@ public class ExportService<K extends AssetId, V extends Asset<K>> extends Servic
             return null;
         }
 
-        private void exportAsset(V asset) throws Exception {
+        private void exportAsset(PsarcAsset asset) throws Exception {
             Thread.sleep(1);
 
             Path target = path.resolve(asset.id().fullName());
