@@ -13,7 +13,10 @@ import javafx.scene.control.*;
 import javafx.scene.control.Button;
 import javafx.scene.control.MenuItem;
 import javafx.scene.image.ImageView;
-import javafx.scene.input.*;
+import javafx.scene.input.DataFormat;
+import javafx.scene.input.Dragboard;
+import javafx.scene.input.KeyCombination;
+import javafx.scene.input.TransferMode;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.paint.Color;
 import javafx.stage.DirectoryChooser;
@@ -22,10 +25,7 @@ import javafx.stage.Stage;
 import javafx.stage.StageStyle;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import sh.adelessfox.psarc.archive.Archive;
-import sh.adelessfox.psarc.archive.Asset;
-import sh.adelessfox.psarc.archive.AssetId;
-import sh.adelessfox.psarc.archive.PsarcArchive;
+import sh.adelessfox.psarc.archive.*;
 import sh.adelessfox.psarc.settings.Settings;
 import sh.adelessfox.psarc.ui.StatusBar;
 import sh.adelessfox.psarc.ui.StructuredTreeItem;
@@ -272,28 +272,6 @@ public final class AppWindow extends Application {
             }
         });
 
-        view.setOnDragDetected(event -> {
-            var item = view.getSelectionModel().getSelectedItem();
-            if (!(item.getValue() instanceof ArchiveStructure.File<V> file)) {
-                return;
-            }
-
-            File result;
-
-            @SuppressWarnings("unchecked")
-            Archive<K, V> archive = (Archive<K, V>) this.archive.get();
-
-            try {
-                result = extractToTemporaryFile(archive, file.asset).toFile();
-            } catch (IOException e) {
-                throw new UncheckedIOException(e);
-            }
-
-            Dragboard dragboard = view.startDragAndDrop(TransferMode.MOVE);
-            dragboard.setContent(Map.of(DataFormat.FILES, List.of(result)));
-            event.consume();
-        });
-
         view.setOnDragOver(event -> {
             var dragboard = event.getDragboard();
             if (dragboard.hasFiles() && dragboard.getFiles().size() == 1) {
@@ -313,66 +291,45 @@ public final class AppWindow extends Application {
             event.consume();
         });
 
-        view.setOnMouseClicked(event -> {
-            if (event.getButton() != MouseButton.PRIMARY || event.getClickCount() % 2 != 0) {
-                return;
-            }
-
-            // TODO: Fix double-click on the expander triggering the action
-            var item = view.getSelectionModel().getSelectedItem();
-            if (!(item.getValue() instanceof ArchiveStructure.File<V> file)) {
-                return;
-            }
-
-            @SuppressWarnings("unchecked")
-            Archive<K, V> archive = (Archive<K, V>) this.archive.get();
-
-            try {
-                Desktop.getDesktop().open(extractToTemporaryFile(archive, file.asset).toFile());
-            } catch (IOException e) {
-                throw new UncheckedIOException(e);
-            }
-        });
-
         return view;
     }
 
-    private static <K extends AssetId, V extends Asset<K>> Path extractToTemporaryFile(Archive<K, V> archive, V asset) throws IOException {
-        var id = asset.id();
-        var root = Path.of(System.getProperty("java.io.tmpdir"), "psarc-dnd");
-        var path = root.resolve(id.fileName());
-
-        log.debug("Creating a temporary file {}", path);
-
-        if (Files.notExists(root)) {
-            Files.createDirectory(root);
-        }
-
-        try (var channel = Files.newByteChannel(path, WRITE, CREATE, TRUNCATE_EXISTING)) {
-            channel.write(archive.read(id));
-        }
-
-        return path;
-    }
-
-    private static <T extends Asset<?>> List<TreeTableColumn<ArchiveStructure<T>, ?>> buildTreeTableColumns() {
+    private <T extends Asset<?>> List<TreeTableColumn<ArchiveStructure<T>, ?>> buildTreeTableColumns() {
         var nameColumn = new TreeTableColumn<ArchiveStructure<T>, ArchiveStructure<T>>("Name");
         nameColumn.setReorderable(false);
         nameColumn.setSortable(false);
         nameColumn.setCellValueFactory(features -> features.getValue().valueProperty());
-        nameColumn.setCellFactory(_ -> new TreeTableCell<>() {
-            @Override
-            protected void updateItem(ArchiveStructure<T> item, boolean empty) {
-                super.updateItem(item, empty);
+        nameColumn.setCellFactory(_ -> {
+            var cell = new TreeTableCell<ArchiveStructure<T>, ArchiveStructure<T>>() {
+                @Override
+                protected void updateItem(ArchiveStructure<T> item, boolean empty) {
+                    super.updateItem(item, empty);
 
-                if (empty) {
-                    setText(null);
-                    setGraphic(null);
-                } else {
-                    setText(item.name);
-                    setGraphic(Fugue.getImageView(item instanceof ArchiveStructure.File ? "document" : "folder"));
+                    if (empty) {
+                        setText(null);
+                        setGraphic(null);
+                    } else {
+                        setText(item.name);
+                        setGraphic(Fugue.getImageView(item instanceof ArchiveStructure.File ? "document" : "folder"));
+                    }
                 }
-            }
+            };
+            cell.setOnMouseClicked(event -> {
+                if (!FxUtils.isPrimaryDoubleClick(event) || FxUtils.isDisclosureNode(cell, event)) {
+                    return;
+                }
+                if (cell.getItem() instanceof ArchiveStructure.File<?> file) {
+                    openInExternalApplication((PsarcAsset) file.asset);
+                    event.consume();
+                }
+            });
+            cell.setOnDragDetected(event -> {
+                if (cell.getItem() instanceof ArchiveStructure.File<?> file) {
+                    startDragAndDrop(cell.getTreeTableView(), (PsarcAsset) file.asset);
+                    event.consume();
+                }
+            });
+            return cell;
         });
 
         var sizeColumn = new TreeTableColumn<ArchiveStructure<T>, ArchiveStructure<T>>("Size");
@@ -395,5 +352,44 @@ public final class AppWindow extends Application {
         });
 
         return List.of(nameColumn, sizeColumn);
+    }
+
+    private void startDragAndDrop(TreeTableView<?> view, PsarcAsset asset) {
+        File result;
+
+        try {
+            result = extractToTemporaryFile(archive.get(), asset).toFile();
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+
+        Dragboard dragboard = view.startDragAndDrop(TransferMode.MOVE);
+        dragboard.setContent(Map.of(DataFormat.FILES, List.of(result)));
+    }
+
+    private void openInExternalApplication(PsarcAsset asset) {
+        try {
+            Desktop.getDesktop().open(extractToTemporaryFile(archive.get(), asset).toFile());
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+    }
+
+    private static <K extends AssetId, V extends Asset<K>> Path extractToTemporaryFile(Archive<K, V> archive, V asset) throws IOException {
+        var id = asset.id();
+        var root = Path.of(System.getProperty("java.io.tmpdir"), "psarc-dnd");
+        var path = root.resolve(id.fileName());
+
+        log.debug("Creating a temporary file {}", path);
+
+        if (Files.notExists(root)) {
+            Files.createDirectory(root);
+        }
+
+        try (var channel = Files.newByteChannel(path, WRITE, CREATE, TRUNCATE_EXISTING)) {
+            channel.write(archive.read(id));
+        }
+
+        return path;
     }
 }
