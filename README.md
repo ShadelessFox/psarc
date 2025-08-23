@@ -36,3 +36,9 @@ All files from an archive can be extracted using the `extract` command:
 ```bash
 psarc-cli extract --dir path/to/output path/to/archive.psarc
 ```
+
+## License
+
+This project is licensed under the GPL-3.0 license.
+
+This project uses icons by [Yusuke Kamiyamane](http://p.yusukekamiyamane.com/), licensed under a [CC BY 3.0 License](http://creativecommons.org/licenses/by/3.0/).
