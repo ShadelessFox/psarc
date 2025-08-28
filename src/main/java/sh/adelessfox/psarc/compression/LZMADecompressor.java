@@ -12,11 +12,13 @@ final class LZMADecompressor extends Decompressor {
     @Override
     public void decompress(ByteBuffer src, ByteBuffer dst) throws IOException {
         try (LZMAInputStream is = new LZMAInputStream(new ByteBufferInputStream(src))) {
-            int read = is.read(dst.array(), 0, dst.remaining());
-            if (read != dst.remaining()) {
-                throw new IOException("Decompression failed");
+            while (src.hasRemaining()) {
+                int read = is.read(dst.array(), dst.position(), dst.remaining());
+                if (read != dst.remaining()) {
+                    throw new IOException("Decompression failed");
+                }
+                dst.position(dst.position() + read);
             }
-            dst.position(dst.position() + read);
         }
     }
 
