@@ -336,8 +336,8 @@ public final class AppWindow extends Application {
         var sizeColumn = new TreeTableColumn<ArchiveStructure<T>, ArchiveStructure<T>>("Size");
         sizeColumn.setReorderable(false);
         sizeColumn.setSortable(false);
-        sizeColumn.setMinWidth(100);
-        sizeColumn.setMaxWidth(100);
+        sizeColumn.setMinWidth(150);
+        sizeColumn.setMaxWidth(150);
         sizeColumn.setCellValueFactory(features -> features.getValue().valueProperty());
         sizeColumn.setCellFactory(_ -> new TreeTableCell<>() {
             @Override

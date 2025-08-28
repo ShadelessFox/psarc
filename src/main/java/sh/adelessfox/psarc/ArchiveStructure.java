@@ -5,6 +5,7 @@ import sh.adelessfox.psarc.archive.Asset;
 import sh.adelessfox.psarc.ui.TreeStructure;
 import sh.adelessfox.psarc.util.type.FileCount;
 import sh.adelessfox.psarc.util.type.FilePath;
+import sh.adelessfox.psarc.util.type.FileSize;
 
 import java.util.*;
 import java.util.stream.Collectors;
@@ -60,9 +61,12 @@ sealed abstract class ArchiveStructure<T extends Asset<?>> implements TreeStruct
         }
 
         static <T extends Asset<?>> Folder<T> of(NavigableMap<FilePath, T> paths, Folder<T> parent, FilePath path) {
-            var children = FileCount.of(collectChildren(paths, path).count());
             var name = toDisplayName(parent, path);
-            return new Folder<>(paths, path, name, children.toString());
+            var count = FileCount.of(collectChildren(paths, path).count());
+            var size = FileSize.ofBytes(childrenPaths(paths, path).values().stream()
+                .mapToLong(asset -> asset.size().toBytes())
+                .sum());
+            return new Folder<>(paths, path, name, "%s (%s)".formatted(size, count));
         }
 
         static <T extends Asset<?>> Folder<T> of(NavigableMap<FilePath, T> paths) {
@@ -97,8 +101,12 @@ sealed abstract class ArchiveStructure<T extends Asset<?>> implements TreeStruct
             return path.subpath(parent.path.length()).full("\u2009/\u2009");
         }
 
+        private static <T extends Asset<?>> NavigableMap<FilePath, T> childrenPaths(NavigableMap<FilePath, T> paths, FilePath path) {
+            return paths.subMap(path, true, path.resolve(FilePath.any()), false);
+        }
+
         private static <T extends Asset<?>> Stream<PathWithAsset<T>> collectChildren(NavigableMap<FilePath, T> paths, FilePath path) {
-            var children = paths.subMap(path, true, path.resolve(FilePath.any()), false);
+            var children = childrenPaths(paths, path);
             return Stream.concat(
                 collectFolders(children, path),
                 collectFiles(children, path)
