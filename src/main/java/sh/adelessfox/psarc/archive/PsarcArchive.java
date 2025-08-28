@@ -6,6 +6,7 @@ import sh.adelessfox.psarc.compression.Decompressor;
 import sh.adelessfox.psarc.hashing.HashCode;
 import sh.adelessfox.psarc.hashing.HashFunction;
 import sh.adelessfox.psarc.io.BinaryReader;
+import sh.adelessfox.psarc.util.type.FourCC;
 
 import java.io.FileNotFoundException;
 import java.io.IOException;
@@ -18,8 +19,6 @@ import java.util.*;
 public final class PsarcArchive implements Archive<PsarcAssetId, PsarcAsset> {
     private static final Logger log = LoggerFactory.getLogger(PsarcArchive.class);
 
-    private static final int COMPRESSION_ZLIB = 'z' << 24 | 'l' << 16 | 'i' << 8 | 'b';
-
     private final BinaryReader reader;
     private final Decompressor decompressor;
 
@@ -27,13 +26,14 @@ public final class PsarcArchive implements Archive<PsarcAssetId, PsarcAsset> {
     private final short[] sizes;
     private final SortedMap<PsarcAssetId, PsarcAsset> assets = new TreeMap<>();
 
-    public PsarcArchive(Path path, ByteOrder order) throws IOException {
-        this.reader = BinaryReader.open(path).order(order);
+    public PsarcArchive(Path path) throws IOException {
+        this.reader = BinaryReader.open(path).order(ByteOrder.BIG_ENDIAN);
         this.header = Header.read(reader);
-        this.decompressor = switch (header.compression()) {
-            case COMPRESSION_ZLIB -> Decompressor.deflate();
-            default ->
-                throw new IOException("Unsupported PSARC compression type: %08x".formatted(header.compression()));
+        this.decompressor = switch (header.compression().toString()) {
+            case "zlib" -> Decompressor.deflate();
+            case "lzma" -> Decompressor.lzma();
+            case "oodl" -> Decompressor.oodle();
+            default -> throw new IOException("Unsupported compression type: " + header.compression());
         };
 
         var entries = reader.readObjects(header.tocEntries, Entry::read);
@@ -83,6 +83,7 @@ public final class PsarcArchive implements Archive<PsarcAssetId, PsarcAsset> {
     @Override
     public void close() throws IOException {
         reader.close();
+        decompressor.close();
     }
 
     private PsarcAssetId transformId(PsarcAssetId id) {
@@ -91,7 +92,7 @@ public final class PsarcArchive implements Archive<PsarcAssetId, PsarcAsset> {
 
     private String[] readManifest(Entry entry) throws IOException {
         byte[] manifest = read(entry.uncompressedSize, entry.blockOffset, entry.fileOffset).array();
-        return new String(manifest, StandardCharsets.UTF_8).split("\n");
+        return new String(manifest, StandardCharsets.UTF_8).split("[\n\u0000]");
     }
 
     private ByteBuffer read(long uncompressedSize, int index, long blockOffset) throws IOException {
@@ -109,8 +110,10 @@ public final class PsarcArchive implements Archive<PsarcAssetId, PsarcAsset> {
                 reader.readBytes(output.array(), output.position(), size);
                 output.position(output.position() + size);
             } else {
+                int length = Math.min(output.remaining(), header.blockSize());
                 reader.readBytes(buffer, 0, size);
-                decompressor.decompress(ByteBuffer.wrap(buffer, 0, size), output);
+                decompressor.decompress(buffer, 0, size, output.array(), output.position(), length);
+                output.position(output.position() + length);
             }
         }
 
@@ -118,34 +121,34 @@ public final class PsarcArchive implements Archive<PsarcAssetId, PsarcAsset> {
     }
 
     private record Header(
-        int magic,
+        FourCC magic,
         short major,
         short minor,
-        int compression,
+        FourCC compression,
         int tocSize,
         int tocEntrySize,
         int tocEntries,
         int blockSize,
         int flags
     ) {
-        static final int MAGIC = 'P' << 24 | 'S' << 16 | 'A' << 8 | 'R';
+        static final FourCC MAGIC = FourCC.of("PSAR");
         static final int BYTES = 32;
 
         private static final int FLAGS_IGNORE_CASE = 0x01;
         private static final int FLAGS_ABSOLUTE = 0x02;
 
         static Header read(BinaryReader reader) throws IOException {
-            var magic = reader.readInt();
+            var magic = FourCC.of(reader.readInt());
             var major = reader.readShort();
             var minor = reader.readShort();
-            var compression = reader.readInt();
+            var compression = FourCC.of(reader.readInt());
             var tocSize = reader.readInt();
             var tocEntrySize = reader.readInt();
             var tocEntries = reader.readInt();
             var blockSize = reader.readInt();
             var flags = reader.readInt();
 
-            if (magic != MAGIC) {
+            if (!magic.equals(MAGIC)) {
                 throw new IOException("Magic expected to be " + MAGIC + ", was " + magic);
             }
 

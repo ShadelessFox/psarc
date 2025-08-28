@@ -11,6 +11,7 @@ module psarc.app {
     requires javafx.controls;
     requires javafx.graphics;
     requires org.slf4j;
+    requires org.tukaani.xz;
 
     exports sh.adelessfox.psarc.archive;
     exports sh.adelessfox.psarc.ui;
