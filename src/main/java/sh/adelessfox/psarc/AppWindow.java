@@ -39,8 +39,6 @@ import sh.adelessfox.psarc.util.type.FileSize;
 import java.awt.*;
 import java.io.File;
 import java.io.IOException;
-import java.io.UncheckedIOException;
-import java.nio.ByteOrder;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -131,7 +129,7 @@ public final class AppWindow extends Application {
     private void chooseArchive() {
         var chooser = new FileChooser();
         chooser.setTitle("Choose archive to load");
-        chooser.setInitialDirectory(settings.lastDirectory().map(Path::toFile).orElse(null));
+        chooser.setInitialDirectory(settings.lastDirectory().filter(Files::exists).map(Path::toFile).orElse(null));
         chooser.getExtensionFilters().add(new FileChooser.ExtensionFilter("PlayStation Archive", "*.psarc"));
 
         var file = chooser.showOpenDialog(stage);
@@ -147,18 +145,19 @@ public final class AppWindow extends Application {
             return;
         }
         try {
-            setArchive(new PsarcArchive(path, ByteOrder.BIG_ENDIAN));
+            setArchive(new PsarcArchive(path));
             setPath(path);
             addRecentPath(path);
         } catch (IOException e) {
-            throw new UncheckedIOException(e);
+            log.error("Error loading archive", e);
+            FxUtils.showExceptionDialog(stage, "Unable to load archive", e);
         }
     }
 
     private void extractArchive() {
         var chooser = new DirectoryChooser();
         chooser.setTitle("Choose output directory");
-        chooser.setInitialDirectory(settings.lastDirectory().map(Path::toFile).orElse(null));
+        chooser.setInitialDirectory(settings.lastDirectory().filter(Files::exists).map(Path::toFile).orElse(null));
 
         var path = chooser.showDialog(stage);
         if (path == null) {
@@ -362,7 +361,9 @@ public final class AppWindow extends Application {
         try {
             result = extractToTemporaryFile(archive.get(), asset).toFile();
         } catch (IOException e) {
-            throw new UncheckedIOException(e);
+            log.error("Error extracting asset", e);
+            FxUtils.showExceptionDialog(stage, "Can't extract asset for drag and drop operation", e);
+            return;
         }
 
         Dragboard dragboard = view.startDragAndDrop(TransferMode.MOVE);
@@ -373,7 +374,8 @@ public final class AppWindow extends Application {
         try {
             Desktop.getDesktop().open(extractToTemporaryFile(archive.get(), asset).toFile());
         } catch (IOException e) {
-            throw new UncheckedIOException(e);
+            log.error("Error opening asset in an external application", e);
+            FxUtils.showExceptionDialog(stage, "Can't open asset in external application", e);
         }
     }
 

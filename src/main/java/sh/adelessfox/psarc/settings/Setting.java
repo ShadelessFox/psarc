@@ -4,6 +4,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.function.Consumer;
 import java.util.function.Function;
+import java.util.function.Predicate;
 import java.util.function.Supplier;
 
 public final class Setting<T> {
@@ -32,11 +33,18 @@ public final class Setting<T> {
     }
 
     public <U> Optional<U> map(Function<? super T, ? extends U> mapper) {
-        Objects.requireNonNull(mapper);
         if (value == null) {
             return Optional.empty();
         } else {
             return Optional.ofNullable(mapper.apply(value));
+        }
+    }
+
+    public Optional<T> filter(Predicate<? super T> predicate) {
+        if (value == null) {
+            return Optional.empty();
+        } else {
+            return predicate.test(value) ? Optional.of(value) : Optional.empty();
         }
     }
 
