@@ -43,9 +43,10 @@ public final class PsarcArchive implements Archive<PsarcAssetId, PsarcAsset> {
         var names = new HashMap<HashCode, String>();
 
         for (String name : manifest) {
+            assert !header.isAbsolute() || name.charAt(0) == '/';
             var key = header.isIgnoreCase() ? name.toUpperCase(Locale.ROOT) : name;
-            var hash = HashFunction.md5().hash(key);
-            names.put(hash, name);
+            var value = header.isAbsolute() ? name.substring(1) : name;
+            names.put(HashFunction.md5().hash(key), value);
         }
 
         for (int i = 1; i < entries.size(); i++) {
