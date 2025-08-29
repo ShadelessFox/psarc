@@ -29,6 +29,10 @@ public interface BinaryReader extends Closeable {
         return new ChannelBinaryReader(Files.newByteChannel(path, StandardOpenOption.READ));
     }
 
+    static BinaryReader of(List<? extends BinaryReader> readers) {
+        return new SequenceBinaryReader(readers);
+    }
+
     byte readByte() throws IOException;
 
     void readBytes(byte[] dst, int off, int len) throws IOException;
@@ -156,9 +160,9 @@ public interface BinaryReader extends Closeable {
         return List.copyOf(dst);
     }
 
-    long size() throws IOException;
+    long size();
 
-    long position() throws IOException;
+    long position();
 
     void position(long pos) throws IOException;
 
@@ -168,10 +172,5 @@ public interface BinaryReader extends Closeable {
 
     default long remaining() throws IOException {
         return size() - position();
-    }
-
-    default void skip(int count) throws IOException {
-        Objects.checkIndex(count, Integer.MAX_VALUE);
-        position(position() + count);
     }
 }

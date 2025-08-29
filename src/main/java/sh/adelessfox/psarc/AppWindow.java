@@ -49,7 +49,9 @@ import static java.nio.file.StandardOpenOption.*;
 
 public final class AppWindow extends Application {
     private static final Logger log = LoggerFactory.getLogger(AppWindow.class);
+
     private static final String TITLE = "PSARC Viewer";
+    private static final List<String> EXTENSIONS = List.of("*.psarc", "*.psarc.000", "*.psarc.66600");
 
     private final ObjectProperty<Path> path = new SimpleObjectProperty<>(this, "path");
     private final ObjectProperty<PsarcArchive> archive = new SimpleObjectProperty<>(this, "archive");
@@ -130,7 +132,7 @@ public final class AppWindow extends Application {
         var chooser = new FileChooser();
         chooser.setTitle("Choose archive to load");
         chooser.setInitialDirectory(settings.lastDirectory().filter(Files::exists).map(Path::toFile).orElse(null));
-        chooser.getExtensionFilters().add(new FileChooser.ExtensionFilter("PlayStation Archive", "*.psarc"));
+        chooser.getExtensionFilters().add(new FileChooser.ExtensionFilter("PlayStation Archive", EXTENSIONS));
 
         var file = chooser.showOpenDialog(stage);
         if (file != null) {

@@ -6,6 +6,7 @@ import sh.adelessfox.psarc.compression.Decompressor;
 import sh.adelessfox.psarc.hashing.HashCode;
 import sh.adelessfox.psarc.hashing.HashFunction;
 import sh.adelessfox.psarc.io.BinaryReader;
+import sh.adelessfox.psarc.util.Filenames;
 import sh.adelessfox.psarc.util.type.FourCC;
 
 import java.io.FileNotFoundException;
@@ -13,8 +14,11 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.*;
+import java.util.regex.Pattern;
+import java.util.stream.Stream;
 
 public final class PsarcArchive implements Archive<PsarcAssetId, PsarcAsset> {
     private static final Logger log = LoggerFactory.getLogger(PsarcArchive.class);
@@ -27,7 +31,26 @@ public final class PsarcArchive implements Archive<PsarcAssetId, PsarcAsset> {
     private final SortedMap<PsarcAssetId, PsarcAsset> assets = new TreeMap<>();
 
     public PsarcArchive(Path path) throws IOException {
-        this.reader = BinaryReader.open(path).order(ByteOrder.BIG_ENDIAN);
+        if (isSplit(path)) {
+            List<Path> parts = findParts(path);
+            List<BinaryReader> readers = new ArrayList<>(parts.size());
+
+            try {
+                for (Path part : parts) {
+                    readers.add(BinaryReader.open(part));
+                }
+            } catch (IOException e) {
+                for (BinaryReader reader : readers) {
+                    reader.close();
+                }
+                throw e;
+            }
+
+            this.reader = BinaryReader.of(readers).order(ByteOrder.BIG_ENDIAN);
+        } else {
+            this.reader = BinaryReader.open(path).order(ByteOrder.BIG_ENDIAN);
+        }
+
         this.header = Header.read(reader);
         this.decompressor = switch (header.compression().toString()) {
             case "zlib" -> Decompressor.deflate();
@@ -119,6 +142,23 @@ public final class PsarcArchive implements Archive<PsarcAssetId, PsarcAsset> {
         }
 
         return output.position(0);
+    }
+
+    private static boolean isSplit(Path path) {
+        return Filenames.getExtension(path).matches("[0-9]+");
+    }
+
+    private static List<Path> findParts(Path path) throws IOException {
+        String filename = path.getFileName().toString();
+        String basename = filename.substring(0, filename.lastIndexOf('.'));
+        Pattern pattern = Pattern.compile(Pattern.quote(basename) + "\\.[0-9]+");
+
+        try (Stream<Path> stream = Files.list(path.getParent())) {
+            return stream
+                .filter(p -> pattern.matcher(p.getFileName().toString()).matches())
+                .sorted(Path::compareTo)
+                .toList();
+        }
     }
 
     private record Header(

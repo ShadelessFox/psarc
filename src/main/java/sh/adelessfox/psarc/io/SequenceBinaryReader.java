@@ -4,22 +4,34 @@ import java.io.EOFException;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
-import java.nio.channels.SeekableByteChannel;
+import java.util.List;
+import java.util.NavigableMap;
 import java.util.Objects;
+import java.util.TreeMap;
 
-final class ChannelBinaryReader implements BinaryReader {
+public class SequenceBinaryReader implements BinaryReader {
     private final ByteBuffer buffer = ByteBuffer.allocate(16384)
         .order(ByteOrder.LITTLE_ENDIAN)
         .limit(0);
 
-    private final SeekableByteChannel channel;
+    private final NavigableMap<Long, BinaryReader> readers;
     private final long size;
     private long position;
+    private BinaryReader reader;
 
-    ChannelBinaryReader(SeekableByteChannel channel) throws IOException {
-        this.channel = channel;
-        this.size = channel.size();
-        this.position = channel.position();
+    SequenceBinaryReader(List<? extends BinaryReader> readers) {
+        if (readers.isEmpty()) {
+            throw new IllegalArgumentException("At least one reader must be provided");
+        }
+
+        this.readers = new TreeMap<>(Long::compareUnsigned);
+        this.size = readers.stream().mapToLong(BinaryReader::size).sum();
+
+        long offset = 0;
+        for (BinaryReader reader : readers) {
+            this.readers.put(offset, reader);
+            offset += reader.size();
+        }
     }
 
     @Override
@@ -108,12 +120,13 @@ final class ChannelBinaryReader implements BinaryReader {
     public void position(long pos) throws IOException {
         Objects.checkIndex(pos, size + 1);
 
-        if (pos >= position && pos < position + buffer.limit()) {
+        var reader = peekReader(pos);
+        if (reader == this.reader && pos >= position && pos < position + buffer.limit()) {
             buffer.position(Math.toIntExact(pos - position));
         } else {
-            position = pos;
             buffer.limit(0);
-            channel.position(pos);
+            position = pos;
+            positionReader(pos);
         }
     }
 
@@ -130,20 +143,11 @@ final class ChannelBinaryReader implements BinaryReader {
 
     @Override
     public void close() throws IOException {
-        channel.close();
+        for (BinaryReader reader : readers.values()) {
+            reader.close();
+        }
     }
 
-    @Override
-    public String toString() {
-        return "ChannelBinaryReader[position=" + position() + ", size=" + size() + "]";
-    }
-
-    /**
-     * Optionally refills the buffer if it contains less than {@code count} bytes remaining.
-     *
-     * @param count number of bytes to refill
-     * @throws IOException if an I/O error occurs
-     */
     private void refill(int count) throws IOException {
         if (buffer.capacity() < count) {
             throw new IllegalArgumentException("Can't refill more bytes than the buffer can hold");
@@ -156,13 +160,8 @@ final class ChannelBinaryReader implements BinaryReader {
         }
     }
 
-    /**
-     * Compacts the buffer and fills the remaining, updating the {@code position} accordingly.
-     *
-     * @throws IOException if an I/O error occurs
-     */
     private void refill() throws IOException {
-        long start = buffer.position() + position;
+        long start = position();
         long end = Math.min(start + buffer.capacity(), size);
 
         position = start;
@@ -172,17 +171,30 @@ final class ChannelBinaryReader implements BinaryReader {
         buffer.flip();
     }
 
-    /**
-     * Reads from the channel into the destination buffer until it is full.
-     *
-     * @param dst destination buffer
-     * @throws IOException if an I/O error occurs
-     */
     private void read(ByteBuffer dst) throws IOException {
+        long position = position();
         while (dst.hasRemaining()) {
-            if (channel.read(dst) < 0) {
+            if (reader == null || reader.remaining() == 0) {
+                positionReader(position);
+            }
+            if (reader.remaining() == 0) {
                 throw new EOFException();
             }
+            int read = Math.min(Math.toIntExact(reader.remaining()), dst.remaining());
+            reader.readBytes(dst.array(), dst.position(), read);
+            dst.position(dst.position() + read);
+            position += read;
         }
+    }
+
+    private void positionReader(long position) throws IOException {
+        var entry = readers.floorEntry(position);
+        var base = (long) entry.getKey();
+        reader = entry.getValue();
+        reader.position(position - base);
+    }
+
+    private BinaryReader peekReader(long position) {
+        return readers.floorEntry(position).getValue();
     }
 }
