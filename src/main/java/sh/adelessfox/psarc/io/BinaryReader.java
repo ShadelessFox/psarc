@@ -29,7 +29,7 @@ public interface BinaryReader extends Closeable {
         return new ChannelBinaryReader(Files.newByteChannel(path, StandardOpenOption.READ));
     }
 
-    static BinaryReader of(List<? extends BinaryReader> readers) {
+    static BinaryReader of(List<? extends BinaryReader> readers) throws IOException {
         return new SequenceBinaryReader(readers);
     }
 
@@ -164,13 +164,17 @@ public interface BinaryReader extends Closeable {
 
     long position();
 
-    void position(long pos) throws IOException;
+    void position(long position) throws IOException;
 
     ByteOrder order();
 
     BinaryReader order(ByteOrder order);
 
-    default long remaining() throws IOException {
+    default long remaining() {
         return size() - position();
+    }
+
+    default boolean hasRemaining() {
+        return remaining() > 0;
     }
 }
