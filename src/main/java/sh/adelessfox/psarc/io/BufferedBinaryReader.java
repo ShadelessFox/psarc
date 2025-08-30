@@ -7,14 +7,12 @@ import java.nio.ByteOrder;
 import java.util.Objects;
 
 abstract class BufferedBinaryReader implements BinaryReader {
-    private final ByteBuffer buffer = ByteBuffer.allocate(16384)
-        .order(ByteOrder.LITTLE_ENDIAN)
-        .limit(0);
+    private final ByteBuffer buffer = ByteBuffer.allocate(16384).limit(0);
 
     protected final long size;
     protected long position;
 
-    BufferedBinaryReader(long size) throws IOException {
+    BufferedBinaryReader(long size) {
         this.size = size;
     }
 
@@ -102,15 +100,19 @@ abstract class BufferedBinaryReader implements BinaryReader {
     }
 
     @Override
-    public final void position(long position) throws IOException {
-        Objects.checkIndex(position, size + 1);
-
-        if (position >= this.position && position < this.position + buffer.limit()) {
-            buffer.position(Math.toIntExact(position - this.position));
+    public final void position(long newPosition) throws IOException {
+        if (newPosition < 0) {
+            throw new IllegalArgumentException("position is negative");
+        }
+        if (newPosition > size) {
+            throw new EOFException("position is beyond the bounds");
+        }
+        if (newPosition >= position && newPosition < position + buffer.limit()) {
+            buffer.position(Math.toIntExact(newPosition - position));
         } else {
-            this.position = position;
+            position = newPosition;
             buffer.limit(0);
-            positionImpl(position);
+            positionImpl(newPosition);
         }
     }
 
@@ -165,12 +167,19 @@ abstract class BufferedBinaryReader implements BinaryReader {
     }
 
     /**
-     * Reads from the underlying source into the destination buffer until it is full.
+     * Fills the destination buffer until it is full.
      *
      * @param dst destination buffer
      * @throws IOException if an I/O error occurs
      */
     protected abstract void readImpl(ByteBuffer dst) throws IOException;
 
+    /**
+     * Adjusts the internal cursor to the given {@code position} for future
+     * <i>read</i> operations via {@link #readImpl(ByteBuffer)}
+     *
+     * @param position new position
+     * @throws IOException if an I/O error occurs
+     */
     protected abstract void positionImpl(long position) throws IOException;
 }

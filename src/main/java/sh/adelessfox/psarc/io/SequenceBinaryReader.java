@@ -11,11 +11,8 @@ final class SequenceBinaryReader extends BufferedBinaryReader {
     private final NavigableMap<Long, BinaryReader> readers = new TreeMap<>(Long::compareUnsigned);
     private BinaryReader reader;
 
-    SequenceBinaryReader(List<? extends BinaryReader> readers) throws IOException {
+    SequenceBinaryReader(List<? extends BinaryReader> readers) {
         super(readers.stream().mapToLong(BinaryReader::size).sum());
-        if (readers.isEmpty()) {
-            throw new IllegalArgumentException("At least one reader must be provided");
-        }
         long offset = 0;
         for (BinaryReader reader : readers) {
             this.readers.put(offset, reader);
@@ -27,10 +24,10 @@ final class SequenceBinaryReader extends BufferedBinaryReader {
     protected void readImpl(ByteBuffer dst) throws IOException {
         long position = position();
         while (dst.hasRemaining()) {
-            if (reader == null || !reader.hasRemaining()) {
+            if (reader == null || reader.isDrained()) {
                 positionImpl(position);
             }
-            if (!reader.hasRemaining()) {
+            if (reader.isDrained()) {
                 throw new EOFException();
             }
             int read = Math.min(Math.toIntExact(reader.remaining()), dst.remaining());

@@ -16,8 +16,9 @@ import java.util.function.IntFunction;
 /**
  * A generic source of data.
  * <p>
- * By default, underlying data is interpreted as little endian. Byte order can
- * be controlled using {@link #order(ByteOrder)} method.
+ * Offers <i>read</i> methods that read values of primitive types,
+ * translating them from sequences of bytes in a particular byte
+ * order specified by {@link #order()}.
  */
 public interface BinaryReader extends Closeable {
     @FunctionalInterface
@@ -29,7 +30,10 @@ public interface BinaryReader extends Closeable {
         return new ChannelBinaryReader(Files.newByteChannel(path, StandardOpenOption.READ));
     }
 
-    static BinaryReader of(List<? extends BinaryReader> readers) throws IOException {
+    static BinaryReader of(List<? extends BinaryReader> readers) {
+        if (readers.isEmpty()) {
+            throw new IllegalArgumentException("At least one reader must be provided");
+        }
         return new SequenceBinaryReader(readers);
     }
 
@@ -174,7 +178,7 @@ public interface BinaryReader extends Closeable {
         return size() - position();
     }
 
-    default boolean hasRemaining() {
-        return remaining() > 0;
+    default boolean isDrained() {
+        return remaining() == 0;
     }
 }
