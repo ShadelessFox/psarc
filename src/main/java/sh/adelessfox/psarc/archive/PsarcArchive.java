@@ -2,12 +2,12 @@ package sh.adelessfox.psarc.archive;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import sh.adelessfox.psarc.compression.Decompressor;
+import sh.adelessfox.psarc.hashing.HashCode;
+import sh.adelessfox.psarc.hashing.HashFunction;
+import sh.adelessfox.psarc.io.BinaryReader;
 import sh.adelessfox.psarc.util.Filenames;
-import wtf.reversed.toolbox.compression.Decompressor;
-import wtf.reversed.toolbox.hashing.HashCode;
-import wtf.reversed.toolbox.hashing.HashFunction;
-import wtf.reversed.toolbox.io.BinaryReader;
-import wtf.reversed.toolbox.type.FourCC;
+import sh.adelessfox.psarc.util.type.FourCC;
 
 import java.io.FileNotFoundException;
 import java.io.IOException;
@@ -55,7 +55,7 @@ public final class PsarcArchive implements Archive<PsarcAssetId, PsarcAsset> {
         this.decompressor = switch (header.compression().toString()) {
             case "zlib" -> Decompressor.deflate();
             case "lzma" -> Decompressor.lzma();
-            case "oodl" -> Decompressor.oodle(findOodleLibrary());
+            case "oodl" -> Decompressor.oodle();
             default -> throw new IOException("Unsupported compression type: " + header.compression());
         };
 
@@ -74,7 +74,7 @@ public final class PsarcArchive implements Archive<PsarcAssetId, PsarcAsset> {
 
         for (int i = 1; i < entries.size(); i++) {
             var entry = entries.get(i);
-            var hash = HashCode.ofBytes(entry.hash);
+            var hash = HashCode.fromBytes(entry.hash);
             var name = names.get(hash);
             if (name == null) {
                 log.warn("Missing name for hash: {}", hash);
@@ -149,27 +149,15 @@ public final class PsarcArchive implements Archive<PsarcAssetId, PsarcAsset> {
     }
 
     private static List<Path> findParts(Path path) throws IOException {
-        var filename = path.getFileName().toString();
-        var basename = filename.substring(0, filename.lastIndexOf('.'));
-        var pattern = Pattern.compile(Pattern.quote(basename) + "\\.[0-9]+");
+        String filename = path.getFileName().toString();
+        String basename = filename.substring(0, filename.lastIndexOf('.'));
+        Pattern pattern = Pattern.compile(Pattern.quote(basename) + "\\.[0-9]+");
 
         try (Stream<Path> stream = Files.list(path.getParent())) {
             return stream
                 .filter(p -> pattern.matcher(p.getFileName().toString()).matches())
                 .sorted(Path::compareTo)
                 .toList();
-        }
-    }
-
-    private static Path findOodleLibrary() throws IOException {
-        var root = Path.of("").toAbsolutePath();
-        var pattern = Pattern.compile("oo2core_.*?_win64\\.dll");
-
-        try (Stream<Path> stream = Files.list(root)) {
-            return stream
-                .filter(p -> pattern.matcher(p.getFileName().toString()).matches())
-                .findFirst()
-                .orElseThrow(() -> new FileNotFoundException("Couldn't find a suitable Oodle library file. Please obtain oo2core_X_win64.dll and put it in " + root.toAbsolutePath()));
         }
     }
 

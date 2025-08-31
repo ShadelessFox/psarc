@@ -13,8 +13,8 @@ import javafx.scene.control.Tooltip;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
-import wtf.reversed.toolbox.type.FileCount;
-import wtf.reversed.toolbox.type.FileSize;
+import sh.adelessfox.psarc.util.type.FileCount;
+import sh.adelessfox.psarc.util.type.FileSize;
 
 public final class StatusBar extends HBox {
     private final ObjectProperty<Node> graphic = new SimpleObjectProperty<>(this, "graphic");

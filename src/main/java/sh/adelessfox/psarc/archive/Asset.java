@@ -1,6 +1,6 @@
 package sh.adelessfox.psarc.archive;
 
-import wtf.reversed.toolbox.type.FileSize;
+import sh.adelessfox.psarc.util.type.FileSize;
 
 public interface Asset<T extends AssetId> extends Comparable<Asset<T>> {
     T id();
