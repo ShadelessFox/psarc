@@ -33,8 +33,8 @@ import sh.adelessfox.psarc.util.Filenames;
 import sh.adelessfox.psarc.util.Fugue;
 import sh.adelessfox.psarc.util.FxUtils;
 import sh.adelessfox.psarc.util.Mica;
-import sh.adelessfox.psarc.util.type.FileCount;
-import sh.adelessfox.psarc.util.type.FileSize;
+import wtf.reversed.toolbox.type.FileCount;
+import wtf.reversed.toolbox.type.FileSize;
 
 import java.awt.*;
 import java.io.File;

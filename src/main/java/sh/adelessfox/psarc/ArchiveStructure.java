@@ -3,9 +3,9 @@ package sh.adelessfox.psarc;
 import sh.adelessfox.psarc.archive.Archive;
 import sh.adelessfox.psarc.archive.Asset;
 import sh.adelessfox.psarc.ui.TreeStructure;
-import sh.adelessfox.psarc.util.type.FileCount;
 import sh.adelessfox.psarc.util.type.FilePath;
-import sh.adelessfox.psarc.util.type.FileSize;
+import wtf.reversed.toolbox.type.FileCount;
+import wtf.reversed.toolbox.type.FileSize;
 
 import java.util.*;
 import java.util.stream.Collectors;

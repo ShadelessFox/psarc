@@ -1,4 +1,6 @@
 module psarc.app {
+    requires wtf.reversed.toolbox;
+
     requires atlantafx.base;
     requires ch.qos.logback.classic;
     requires ch.qos.logback.core;
