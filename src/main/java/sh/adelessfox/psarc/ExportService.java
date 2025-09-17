@@ -2,8 +2,8 @@ package sh.adelessfox.psarc;
 
 import javafx.concurrent.Service;
 import javafx.concurrent.Task;
-import sh.adelessfox.psarc.archive.PsarcArchive;
-import sh.adelessfox.psarc.archive.PsarcAsset;
+import sh.adelessfox.psarc.archive.psarc.PsarcArchive;
+import sh.adelessfox.psarc.archive.psarc.PsarcAsset;
 
 import java.nio.file.Files;
 import java.nio.file.Path;

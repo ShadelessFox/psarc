@@ -1,5 +1,6 @@
-package sh.adelessfox.psarc.archive;
+package sh.adelessfox.psarc.archive.psarc;
 
+import sh.adelessfox.psarc.archive.AssetId;
 import sh.adelessfox.psarc.util.type.FilePath;
 
 public record PsarcAssetId(String name) implements AssetId {

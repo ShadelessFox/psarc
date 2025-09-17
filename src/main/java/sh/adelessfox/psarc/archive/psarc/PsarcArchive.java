@@ -1,19 +1,18 @@
-package sh.adelessfox.psarc.archive;
+package sh.adelessfox.psarc.archive.psarc;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import sh.adelessfox.psarc.archive.Archive;
 import sh.adelessfox.psarc.compression.Decompressor;
 import sh.adelessfox.psarc.hashing.HashCode;
 import sh.adelessfox.psarc.hashing.HashFunction;
 import sh.adelessfox.psarc.io.BinaryReader;
 import sh.adelessfox.psarc.util.Filenames;
-import sh.adelessfox.psarc.util.type.FourCC;
 
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.*;
@@ -26,7 +25,7 @@ public final class PsarcArchive implements Archive<PsarcAssetId, PsarcAsset> {
     private final BinaryReader reader;
     private final Decompressor decompressor;
 
-    private final Header header;
+    private final PsarcHeader header;
     private final short[] sizes;
     private final SortedMap<PsarcAssetId, PsarcAsset> assets = new TreeMap<>();
 
@@ -51,7 +50,7 @@ public final class PsarcArchive implements Archive<PsarcAssetId, PsarcAsset> {
             this.reader = BinaryReader.open(path).order(ByteOrder.BIG_ENDIAN);
         }
 
-        this.header = Header.read(reader);
+        this.header = PsarcHeader.read(reader);
         this.decompressor = switch (header.compression().toString()) {
             case "zlib" -> Decompressor.deflate();
             case "lzma" -> Decompressor.lzma();
@@ -59,13 +58,13 @@ public final class PsarcArchive implements Archive<PsarcAssetId, PsarcAsset> {
             default -> throw new IOException("Unsupported compression type: " + header.compression());
         };
 
-        var entries = reader.readObjects(header.tocEntries, Entry::read);
-        this.sizes = reader.readShorts(header.tocSize - Header.BYTES - Entry.BYTES * header.tocEntries >> 1);
+        var entries = reader.readObjects(header.tocEntries(), PsarcEntry::read);
+        this.sizes = reader.readShorts(header.tocSize() - PsarcHeader.BYTES - PsarcEntry.BYTES * header.tocEntries() >> 1);
 
-        var manifest = readManifest(entries.getFirst());
+        var manifest = PsarcManifest.of(read(entries.getFirst()));
         var names = new HashMap<HashCode, String>();
 
-        for (String name : manifest) {
+        for (String name : manifest.filenames()) {
             assert !header.isAbsolute() || name.charAt(0) == '/';
             var key = header.isIgnoreCase() ? name.toUpperCase(Locale.ROOT) : name;
             var value = header.isAbsolute() ? name.substring(1) : name;
@@ -74,17 +73,25 @@ public final class PsarcArchive implements Archive<PsarcAssetId, PsarcAsset> {
 
         for (int i = 1; i < entries.size(); i++) {
             var entry = entries.get(i);
-            var hash = HashCode.fromBytes(entry.hash);
+            var hash = HashCode.fromBytes(entry.hash());
             var name = names.get(hash);
             if (name == null) {
-                log.warn("Missing name for hash: {}", hash);
+                log.warn("Missing name for entry with hash {}", hash);
                 continue;
             }
 
             var transformedId = PsarcAssetId.of(header.isIgnoreCase() ? name.toUpperCase(Locale.ROOT) : name);
             var originalId = PsarcAssetId.of(name);
-            var asset = new PsarcAsset(originalId, entry.blockOffset, entry.uncompressedSize, entry.fileOffset);
-            assets.put(transformedId, asset);
+            var asset = new PsarcAsset(originalId, entry.blockOffset(), entry.uncompressedSize(), entry.fileOffset());
+
+            var existingAsset = assets.putIfAbsent(transformedId, asset);
+            if (existingAsset != null) {
+                if (existingAsset.equals(asset)) {
+                    log.warn("Found a duplicate entry for asset {}", name);
+                } else {
+                    log.error("Found a duplicate entry for asset {} that points to another location in the archive", name);
+                }
+            }
         }
     }
 
@@ -114,9 +121,8 @@ public final class PsarcArchive implements Archive<PsarcAssetId, PsarcAsset> {
         return header.isIgnoreCase() ? PsarcAssetId.of(id.name().toUpperCase(Locale.ROOT)) : id;
     }
 
-    private String[] readManifest(Entry entry) throws IOException {
-        byte[] manifest = read(entry.uncompressedSize, entry.blockOffset, entry.fileOffset).array();
-        return new String(manifest, StandardCharsets.UTF_8).split("[\n\u0000]");
+    private ByteBuffer read(PsarcEntry entry) throws IOException {
+        return read(entry.uncompressedSize(), entry.blockOffset(), entry.fileOffset());
     }
 
     private ByteBuffer read(long uncompressedSize, int index, long blockOffset) throws IOException {
@@ -161,77 +167,4 @@ public final class PsarcArchive implements Archive<PsarcAssetId, PsarcAsset> {
         }
     }
 
-    private record Header(
-        FourCC magic,
-        short major,
-        short minor,
-        FourCC compression,
-        int tocSize,
-        int tocEntrySize,
-        int tocEntries,
-        int blockSize,
-        int flags
-    ) {
-        static final FourCC MAGIC = FourCC.of("PSAR");
-        static final int BYTES = 32;
-
-        private static final int FLAGS_IGNORE_CASE = 0x01;
-        private static final int FLAGS_ABSOLUTE = 0x02;
-
-        static Header read(BinaryReader reader) throws IOException {
-            var magic = FourCC.of(reader.readInt());
-            var major = reader.readShort();
-            var minor = reader.readShort();
-            var compression = FourCC.of(reader.readInt());
-            var tocSize = reader.readInt();
-            var tocEntrySize = reader.readInt();
-            var tocEntries = reader.readInt();
-            var blockSize = reader.readInt();
-            var flags = reader.readInt();
-
-            if (!magic.equals(MAGIC)) {
-                throw new IOException("Magic expected to be " + MAGIC + ", was " + magic);
-            }
-
-            if (major != 1) {
-                throw new IOException("Unsupported major version: " + major);
-            }
-
-            if (minor != 4 && minor != 3) {
-                throw new IOException("Unsupported minor version: " + minor);
-            }
-
-            if (tocEntrySize != Entry.BYTES) {
-                throw new IOException("TOC entry size expected to be " + Entry.BYTES + ", was " + tocEntrySize);
-            }
-
-            return new Header(magic, major, minor, compression, tocSize, tocEntrySize, tocEntries, blockSize, flags);
-        }
-
-        boolean isIgnoreCase() {
-            return (flags & FLAGS_IGNORE_CASE) == FLAGS_IGNORE_CASE;
-        }
-
-        boolean isAbsolute() {
-            return (flags & FLAGS_ABSOLUTE) == FLAGS_ABSOLUTE;
-        }
-    }
-
-    private record Entry(
-        byte[] hash,
-        int blockOffset,
-        long uncompressedSize,
-        long fileOffset
-    ) {
-        static final int BYTES = 30;
-
-        static Entry read(BinaryReader reader) throws IOException {
-            var hash = reader.readBytes(16);
-            var blockOffset = reader.readInt();
-            var uncompressedSize = Integer.toUnsignedLong(reader.readInt()) << 8 | reader.readByte() & 0xff;
-            var fileOffset = Integer.toUnsignedLong(reader.readInt()) << 8 | reader.readByte() & 0xff;
-
-            return new Entry(hash, blockOffset, uncompressedSize, fileOffset);
-        }
-    }
 }

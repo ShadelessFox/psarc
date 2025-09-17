@@ -2,7 +2,6 @@ package sh.adelessfox.psarc.hashing;
 
 import sh.adelessfox.psarc.util.Arrays;
 
-import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.HexFormat;
 
@@ -22,7 +21,7 @@ public abstract sealed class HashCode {
     HashCode() {
     }
 
-    public abstract ByteBuffer asBuffer();
+    public abstract byte[] asArray();
 
     public abstract int asInt();
 
@@ -47,16 +46,12 @@ public abstract sealed class HashCode {
         private final byte[] hash;
 
         BytesHashCode(byte[] hash) {
-            this.hash = hash;
+            this.hash = java.util.Arrays.copyOf(hash, hash.length);
         }
 
         @Override
-        public ByteBuffer asBuffer() {
-            return ByteBuffer
-                .allocate(hash.length)
-                .order(ByteOrder.LITTLE_ENDIAN)
-                .put(hash)
-                .flip();
+        public byte[] asArray() {
+            return java.util.Arrays.copyOf(hash, hash.length);
         }
 
         @Override
@@ -76,7 +71,7 @@ public abstract sealed class HashCode {
 
         @Override
         boolean equalsSameBits(HashCode that) {
-            return asBuffer().mismatch(that.asBuffer()) == -1;
+            return java.util.Arrays.mismatch(asArray(), that.asArray()) == -1;
         }
 
         @Override
@@ -98,12 +93,13 @@ public abstract sealed class HashCode {
         }
 
         @Override
-        public ByteBuffer asBuffer() {
-            return ByteBuffer
-                .allocate(Integer.BYTES)
-                .order(ByteOrder.LITTLE_ENDIAN)
-                .putInt(hash)
-                .flip();
+        public byte[] asArray() {
+            byte[] bytes = new byte[4];
+            bytes[0] = (byte) (hash >>> 24);
+            bytes[1] = (byte) (hash >>> 16);
+            bytes[2] = (byte) (hash >>> 8);
+            bytes[3] = (byte) (hash);
+            return bytes;
         }
 
         @Override
@@ -145,12 +141,17 @@ public abstract sealed class HashCode {
         }
 
         @Override
-        public ByteBuffer asBuffer() {
-            return ByteBuffer
-                .allocate(Long.BYTES)
-                .order(ByteOrder.LITTLE_ENDIAN)
-                .putLong(hash)
-                .flip();
+        public byte[] asArray() {
+            byte[] bytes = new byte[8];
+            bytes[0] = (byte) (hash >>> 56);
+            bytes[1] = (byte) (hash >>> 48);
+            bytes[2] = (byte) (hash >>> 40);
+            bytes[3] = (byte) (hash >>> 32);
+            bytes[4] = (byte) (hash >>> 24);
+            bytes[5] = (byte) (hash >>> 16);
+            bytes[6] = (byte) (hash >>> 8);
+            bytes[7] = (byte) (hash);
+            return bytes;
         }
 
         @Override

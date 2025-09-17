@@ -1,8 +1,8 @@
 package sh.adelessfox.psarc.cli;
 
 import picocli.CommandLine.Parameters;
-import sh.adelessfox.psarc.archive.PsarcArchive;
-import sh.adelessfox.psarc.archive.PsarcAsset;
+import sh.adelessfox.psarc.archive.psarc.PsarcArchive;
+import sh.adelessfox.psarc.archive.psarc.PsarcAsset;
 
 import java.io.IOException;
 import java.nio.file.Path;
