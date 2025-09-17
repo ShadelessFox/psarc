@@ -2,15 +2,15 @@ package sh.adelessfox.psarc.archive;
 
 import sh.adelessfox.psarc.util.Channels;
 
-import java.io.Closeable;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.ReadableByteChannel;
 import java.nio.file.Files;
+import java.nio.file.OpenOption;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
 
-public interface ArchiveWriter<T extends AssetId> extends Closeable {
+public interface ArchiveWriter<T extends AssetId> {
     /**
      * Adds a new asset to the archive.
      *
@@ -27,12 +27,18 @@ public interface ArchiveWriter<T extends AssetId> extends Closeable {
     void remove(T id);
 
     /**
-     * Finishes writing the archive and closes the underlying stream.
+     * Removes all existing assets from the writer.
+     */
+    void clear();
+
+    /**
+     * Writes a new archive to a file.
      *
+     * @param path    the path to the archive
+     * @param options options specifying how the file is opened
      * @throws IOException if an I/O error has occurred
      */
-    @Override
-    void close() throws IOException;
+    void write(Path path, OpenOption... options) throws IOException;
 
     interface AssetSource {
         ReadableByteChannel open() throws IOException;

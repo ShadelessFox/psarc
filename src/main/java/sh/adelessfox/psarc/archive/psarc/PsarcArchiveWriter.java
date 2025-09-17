@@ -10,18 +10,17 @@ import java.io.EOFException;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.ShortBuffer;
-import java.nio.channels.FileChannel;
 import java.nio.channels.ReadableByteChannel;
 import java.nio.channels.SeekableByteChannel;
+import java.nio.file.Files;
+import java.nio.file.OpenOption;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.SortedMap;
 import java.util.TreeMap;
 
-import static java.nio.file.StandardOpenOption.*;
-
-public class PsarcArchiveWriter implements ArchiveWriter<PsarcAssetId> {
+public final class PsarcArchiveWriter implements ArchiveWriter<PsarcAssetId> {
     private static final Logger log = LoggerFactory.getLogger(PsarcArchiveWriter.class);
 
     private static final FourCC COMPRESSION = FourCC.of("zlib");
@@ -30,11 +29,6 @@ public class PsarcArchiveWriter implements ArchiveWriter<PsarcAssetId> {
     private static final int BLOCK_SIZE = 65536;
 
     private final SortedMap<PsarcAssetId, AssetSource> assets = new TreeMap<>();
-    private final SeekableByteChannel channel;
-
-    public PsarcArchiveWriter(Path path) throws IOException {
-        this.channel = FileChannel.open(path, WRITE, CREATE, TRUNCATE_EXISTING);
-    }
 
     @Override
     public void add(PsarcAssetId id, AssetSource publisher) {
@@ -51,64 +45,76 @@ public class PsarcArchiveWriter implements ArchiveWriter<PsarcAssetId> {
     }
 
     @Override
-    public void close() throws IOException {
-        var manifest = AssetSources.ofByteBuffer(buildManifest().asByteBuffer());
-
-        int manifestBlocks = computeSizeInBlocks(manifest);
-        int assetsBlocks = assets.values().stream().mapToInt(this::computeSizeInBlocks).sum();
-        int totalBlocks = manifestBlocks + assetsBlocks;
-
-        int tocHeaderSize = PsarcHeader.BYTES;
-        int tocEntriesSize = PsarcEntry.BYTES * (assets.size() + 1);
-        int tocBlocksSize = totalBlocks * Short.BYTES;
-        int tocSize = tocHeaderSize + tocEntriesSize + tocBlocksSize;
-
-        // Write data
-        channel.position(tocSize);
-
-        var tocEntries = new ArrayList<PsarcEntry>();
-        var tocBlockBuffer = ByteBuffer.allocate(BLOCK_SIZE);
-        var tocBlockSizesBuffer = ByteBuffer.allocate(tocBlocksSize);
-        var tocBlockSizesShortBuffer = tocBlockSizesBuffer.asShortBuffer();
-
-        // Write manifest
-        tocEntries.add(writeAsset(null, manifest, tocBlockBuffer, tocBlockSizesShortBuffer));
-
-        // Write the rest of assets
-        for (var entry : assets.entrySet()) {
-            tocEntries.add(writeAsset(entry.getKey(), entry.getValue(), tocBlockBuffer, tocBlockSizesShortBuffer));
-        }
-
-        // Write toc
-        channel.position(0);
-        writeToc(tocEntries, tocSize, tocBlockSizesBuffer);
-
-        // We're done
-        channel.close();
+    public void clear() {
+        assets.clear();
     }
 
-    private PsarcEntry writeAsset(PsarcAssetId id, AssetSource source, ByteBuffer currentBlock, ShortBuffer blockSizes) throws IOException {
+    @Override
+    public void write(Path path, OpenOption... options) throws IOException {
+        try (SeekableByteChannel channel = Files.newByteChannel(path, options)) {
+            var manifest = AssetSources.ofByteBuffer(buildManifest().asByteBuffer());
+
+            int manifestBlocks = computeSizeInBlocks(manifest);
+            int assetsBlocks = assets.values().stream().mapToInt(this::computeSizeInBlocks).sum();
+            int totalBlocks = manifestBlocks + assetsBlocks;
+
+            int tocHeaderSize = PsarcHeader.BYTES;
+            int tocEntriesSize = PsarcEntry.BYTES * (assets.size() + 1);
+            int tocBlocksSize = totalBlocks * Short.BYTES;
+            int tocSize = tocHeaderSize + tocEntriesSize + tocBlocksSize;
+
+            // Write data
+            channel.position(tocSize);
+
+            var tocEntries = new ArrayList<PsarcEntry>();
+            var tocBlockBuffer = ByteBuffer.allocate(BLOCK_SIZE);
+            var tocBlockSizesBuffer = ByteBuffer.allocate(tocBlocksSize);
+            var tocBlockSizesShortBuffer = tocBlockSizesBuffer.asShortBuffer();
+
+            // Write manifest
+            tocEntries.add(writeAsset(channel, null, manifest, tocBlockBuffer, tocBlockSizesShortBuffer));
+
+            // Write assets
+            for (var entry : assets.entrySet()) {
+                tocEntries.add(writeAsset(channel, entry.getKey(), entry.getValue(), tocBlockBuffer, tocBlockSizesShortBuffer));
+            }
+
+            // Write toc
+            channel.position(0);
+            writeToc(channel, tocEntries, tocSize, tocBlockSizesBuffer);
+        }
+    }
+
+    private PsarcEntry writeAsset(
+        SeekableByteChannel channel,
+        PsarcAssetId id,
+        AssetSource source,
+        ByteBuffer block,
+        ShortBuffer sizes
+    ) throws IOException {
         log.debug("Writing {} ({} bytes)", id != null ? id : "manifest", source.size());
 
-        var firstBlock = blockSizes.position();
-        var position = channel.position();
+        var firstBlock = sizes.position();
+        var start = channel.position();
         var size = source.size();
 
+        // TODO: compression
         try (ReadableByteChannel src = source.open()) {
             long transferred = 0;
             while (transferred < size) {
-                long read = src.read(currentBlock);
+                long read = src.read(block);
                 if (read < 0) {
                     throw new EOFException();
                 }
                 transferred += read;
-                if (currentBlock.remaining() == 0) {
-                    writeBlock(currentBlock, blockSizes);
+                if (block.remaining() == 0) {
+                    writeAssetBlock(channel, block, sizes);
                 }
             }
-            writeBlock(currentBlock, blockSizes);
+            writeAssetBlock(channel, block, sizes);
         }
 
+        // TODO: absolute/relative/case-insensitive flags
         byte[] hash;
         if (id != null) {
             hash = HashFunction.md5().hash(id.name()).asArray();
@@ -116,20 +122,29 @@ public class PsarcArchiveWriter implements ArchiveWriter<PsarcAssetId> {
             hash = new byte[16];
         }
 
-        return new PsarcEntry(hash, firstBlock, size, position);
+        return new PsarcEntry(hash, firstBlock, size, start);
     }
 
-    private void writeBlock(ByteBuffer block, ShortBuffer blockSizes) throws IOException {
+    private void writeAssetBlock(
+        SeekableByteChannel channel,
+        ByteBuffer block,
+        ShortBuffer sizes
+    ) throws IOException {
         int position = block.position();
         if (position > 0) {
             block.flip();
-            write(block);
+            write(channel, block);
             block.clear();
-            blockSizes.put((short) position);
+            sizes.put((short) position);
         }
     }
 
-    private void writeToc(List<PsarcEntry> entries, int tocSize, ByteBuffer tocBlocks) throws IOException {
+    private void writeToc(
+        SeekableByteChannel channel,
+        List<PsarcEntry> entries,
+        int tocSize,
+        ByteBuffer tocBlocks
+    ) throws IOException {
         var header = new PsarcHeader(
             PsarcHeader.PSAR,
             VERSION_MAJOR,
@@ -143,18 +158,18 @@ public class PsarcArchiveWriter implements ArchiveWriter<PsarcAssetId> {
         );
 
         // Write header
-        write(header.toByteBuffer());
+        write(channel, header.toByteBuffer());
 
         // Write toc entries
         for (PsarcEntry entry : entries) {
-            write(entry.toByteBuffer());
+            write(channel, entry.toByteBuffer());
         }
 
         // Write block sizes
-        write(tocBlocks);
+        write(channel, tocBlocks);
     }
 
-    private void write(ByteBuffer buffer) throws IOException {
+    private void write(SeekableByteChannel channel, ByteBuffer buffer) throws IOException {
         int remaining = buffer.remaining();
         if (channel.write(buffer) != remaining) {
             throw new IOException("Failed to write to the channel");

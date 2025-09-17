@@ -12,22 +12,25 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Random;
 
+import static java.nio.file.StandardOpenOption.*;
+
 final class PsarcArchiveWriterTest {
     @Test
     void testNoCompression(@TempDir Path dir) throws IOException {
-        Path path = dir.resolve("sample_no_compression.psarc");
-        Random random = new Random(42);
+        var random = new Random(42);
+        var writer = new PsarcArchiveWriter();
 
-        try (ArchiveWriter<PsarcAssetId> writer = new PsarcArchiveWriter(path)) {
-            for (int i = 0; i < 50; i++) {
-                var data = new byte[random.nextInt(1, 1024 * 128)];
-                random.nextBytes(data);
+        for (int i = 0; i < 50; i++) {
+            var data = new byte[random.nextInt(1, 1024 * 128)];
+            random.nextBytes(data);
 
-                var id = PsarcAssetId.of("/file%d.bin".formatted(i));
-                var source = ArchiveWriter.AssetSources.ofByteArray(data);
-                writer.add(id, source);
-            }
+            var id = PsarcAssetId.of("/file%d.bin".formatted(i));
+            var source = ArchiveWriter.AssetSources.ofByteArray(data);
+            writer.add(id, source);
         }
+
+        Path path = dir.resolve("sample_no_compression.psarc");
+        writer.write(path, WRITE, TRUNCATE_EXISTING, CREATE);
 
         byte[] expected;
         byte[] actual = Files.readAllBytes(path);
