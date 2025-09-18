@@ -10,13 +10,21 @@ final class DeflateDecompressor extends Decompressor {
 
     @Override
     public void decompress(ByteBuffer src, ByteBuffer dst) throws IOException {
-        try {
-            Inflater inflater = new Inflater();
-            inflater.setInput(src);
-            inflater.inflate(dst);
-            inflater.end();
-        } catch (DataFormatException e) {
-            throw new IOException(e);
+        Inflater inflater = new Inflater();
+        inflater.setInput(src);
+
+        while (!inflater.finished()) {
+            try {
+                int count = inflater.inflate(dst);
+                if (count == 0) {
+                    assert !src.hasRemaining();
+                    break;
+                }
+            } catch (DataFormatException e) {
+                throw new IOException("Invalid compressed data", e);
+            }
         }
+
+        inflater.end();
     }
 }

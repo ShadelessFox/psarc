@@ -5,6 +5,7 @@ import org.tukaani.xz.LZMAInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.ByteBuffer;
+import java.util.Objects;
 
 final class LZMADecompressor extends Decompressor {
     static final LZMADecompressor LZMA = new LZMADecompressor();
@@ -36,6 +37,17 @@ final class LZMADecompressor extends Decompressor {
             } else {
                 return -1;
             }
+        }
+
+        @Override
+        public int read(byte[] b, int off, int len) {
+            Objects.checkFromIndexSize(off, len, b.length);
+            if (!buffer.hasRemaining()) {
+                return -1;
+            }
+            int read = Math.min(buffer.remaining(), len);
+            buffer.get(b, off, read);
+            return read;
         }
     }
 }
