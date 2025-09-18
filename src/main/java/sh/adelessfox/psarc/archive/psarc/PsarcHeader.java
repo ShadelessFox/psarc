@@ -10,7 +10,7 @@ public record PsarcHeader(
     FourCC magic,
     short major,
     short minor,
-    FourCC compression,
+    PsarcCompression compression,
     int tocSize,
     int tocEntrySize,
     int tocEntries,
@@ -50,7 +50,19 @@ public record PsarcHeader(
             throw new IOException("TOC entry size expected to be " + PsarcEntry.BYTES + ", was " + tocEntrySize);
         }
 
-        return new PsarcHeader(magic, major, minor, compression, tocSize, tocEntrySize, tocEntries, blockSize, flags);
+        var compressionType = PsarcCompression.of(compression)
+            .orElseThrow(() -> new IOException("Unsupported or invalid compression type: " + compression));
+
+        return new PsarcHeader(magic,
+            major,
+            minor,
+            compressionType,
+            tocSize,
+            tocEntrySize,
+            tocEntries,
+            blockSize,
+            flags
+        );
     }
 
     public ByteBuffer toByteBuffer() {
@@ -58,7 +70,7 @@ public record PsarcHeader(
             .putInt(magic.value())
             .putShort(major)
             .putShort(minor)
-            .putInt(compression.value())
+            .putInt(compression.fourCC().value())
             .putInt(tocSize)
             .putInt(tocEntrySize)
             .putInt(tocEntries)

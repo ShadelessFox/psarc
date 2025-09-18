@@ -4,7 +4,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import sh.adelessfox.psarc.archive.ArchiveWriter;
 import sh.adelessfox.psarc.hashing.HashFunction;
-import sh.adelessfox.psarc.util.type.FourCC;
 
 import java.io.EOFException;
 import java.io.IOException;
@@ -15,24 +14,53 @@ import java.nio.channels.SeekableByteChannel;
 import java.nio.file.Files;
 import java.nio.file.OpenOption;
 import java.nio.file.Path;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.SortedMap;
-import java.util.TreeMap;
+import java.util.*;
 
+/**
+ * A writer for PSARC archives.
+ */
 public final class PsarcArchiveWriter implements ArchiveWriter<PsarcAssetId> {
+    /**
+     * Options that can be specified for PSARC assets.
+     */
+    public enum PsarcAssetOption implements AssetOption {
+        /**
+         * Asset will be stored without any compression.
+         */
+        NO_COMPRESS
+    }
+
     private static final Logger log = LoggerFactory.getLogger(PsarcArchiveWriter.class);
 
-    private static final FourCC COMPRESSION = FourCC.of("zlib");
     private static final short VERSION_MAJOR = 1;
     private static final short VERSION_MINOR = 4;
     private static final int BLOCK_SIZE = 65536;
 
-    private final SortedMap<PsarcAssetId, AssetSource> assets = new TreeMap<>();
+    private final SortedMap<PsarcAssetId, AssetInfo> assets = new TreeMap<>();
+    private final PsarcCompression compression;
+    private final boolean absolute;
+    private final boolean ignoreCase;
+
+    public PsarcArchiveWriter(PsarcCompression compression, boolean absolute, boolean ignoreCase) {
+        this.compression = compression;
+        this.absolute = absolute;
+        this.ignoreCase = ignoreCase;
+    }
 
     @Override
-    public void add(PsarcAssetId id, AssetSource publisher) {
-        if (assets.putIfAbsent(id, publisher) != null) {
+    public void add(PsarcAssetId id, AssetSource source, AssetOption... options) {
+        boolean compress = true;
+        for (AssetOption option : options) {
+            if (option == PsarcAssetOption.NO_COMPRESS) {
+                compress = false;
+                break;
+            }
+        }
+
+        var name = computeName(id);
+        var info = new AssetInfo(name, source, compress);
+
+        if (assets.putIfAbsent(id, info) != null) {
             throw new IllegalArgumentException("Asset " + id + " was already added to the writer");
         }
     }
@@ -55,7 +83,9 @@ public final class PsarcArchiveWriter implements ArchiveWriter<PsarcAssetId> {
             var manifest = AssetSources.ofByteBuffer(buildManifest().asByteBuffer());
 
             int manifestBlocks = computeSizeInBlocks(manifest);
-            int assetsBlocks = assets.values().stream().mapToInt(this::computeSizeInBlocks).sum();
+            int assetsBlocks = assets.values().stream()
+                .mapToInt(asset -> computeSizeInBlocks(asset.source()))
+                .sum();
             int totalBlocks = manifestBlocks + assetsBlocks;
 
             int tocHeaderSize = PsarcHeader.BYTES;
@@ -72,11 +102,21 @@ public final class PsarcArchiveWriter implements ArchiveWriter<PsarcAssetId> {
             var tocBlockSizesShortBuffer = tocBlockSizesBuffer.asShortBuffer();
 
             // Write manifest
-            tocEntries.add(writeAsset(channel, null, manifest, tocBlockBuffer, tocBlockSizesShortBuffer));
+            tocEntries.add(writeAsset(channel, null, manifest, tocBlockBuffer, tocBlockSizesShortBuffer, true));
 
             // Write assets
             for (var entry : assets.entrySet()) {
-                tocEntries.add(writeAsset(channel, entry.getKey(), entry.getValue(), tocBlockBuffer, tocBlockSizesShortBuffer));
+                var id = entry.getKey();
+                var info = entry.getValue();
+
+                tocEntries.add(writeAsset(
+                    channel,
+                    id,
+                    info.source(),
+                    tocBlockBuffer,
+                    tocBlockSizesShortBuffer,
+                    info.compressed()
+                ));
             }
 
             // Write toc
@@ -85,12 +125,18 @@ public final class PsarcArchiveWriter implements ArchiveWriter<PsarcAssetId> {
         }
     }
 
+    @Override
+    public void close() throws IOException {
+        assets.clear();
+    }
+
     private PsarcEntry writeAsset(
         SeekableByteChannel channel,
         PsarcAssetId id,
         AssetSource source,
         ByteBuffer block,
-        ShortBuffer sizes
+        ShortBuffer sizes,
+        boolean compress
     ) throws IOException {
         log.debug("Writing {} ({} bytes)", id != null ? id : "manifest", source.size());
 
@@ -98,7 +144,6 @@ public final class PsarcArchiveWriter implements ArchiveWriter<PsarcAssetId> {
         var start = channel.position();
         var size = source.size();
 
-        // TODO: compression
         try (ReadableByteChannel src = source.open()) {
             long transferred = 0;
             while (transferred < size) {
@@ -108,10 +153,10 @@ public final class PsarcArchiveWriter implements ArchiveWriter<PsarcAssetId> {
                 }
                 transferred += read;
                 if (block.remaining() == 0) {
-                    writeAssetBlock(channel, block, sizes);
+                    writeAssetBlock(channel, block, sizes, compress);
                 }
             }
-            writeAssetBlock(channel, block, sizes);
+            writeAssetBlock(channel, block, sizes, compress);
         }
 
         // TODO: absolute/relative/case-insensitive flags
@@ -128,8 +173,10 @@ public final class PsarcArchiveWriter implements ArchiveWriter<PsarcAssetId> {
     private void writeAssetBlock(
         SeekableByteChannel channel,
         ByteBuffer block,
-        ShortBuffer sizes
+        ShortBuffer sizes,
+        boolean compress
     ) throws IOException {
+        // TODO: actually compress
         int position = block.position();
         if (position > 0) {
             block.flip();
@@ -149,7 +196,7 @@ public final class PsarcArchiveWriter implements ArchiveWriter<PsarcAssetId> {
             PsarcHeader.PSAR,
             VERSION_MAJOR,
             VERSION_MINOR,
-            COMPRESSION,
+            compression,
             tocSize,
             PsarcEntry.BYTES,
             entries.size(),
@@ -183,7 +230,21 @@ public final class PsarcArchiveWriter implements ArchiveWriter<PsarcAssetId> {
         return new PsarcManifest(filenames);
     }
 
+    private String computeName(PsarcAssetId id) {
+        String name = id.name();
+        if (ignoreCase) {
+            name = name.toUpperCase(Locale.ROOT);
+        }
+        if (absolute) {
+            name = '/' + name;
+        }
+        return name;
+    }
+
     private int computeSizeInBlocks(AssetSource source) {
         return Math.toIntExact((source.size() + BLOCK_SIZE - 1) / BLOCK_SIZE);
+    }
+
+    private record AssetInfo(String name, AssetSource source, boolean compressed) {
     }
 }
