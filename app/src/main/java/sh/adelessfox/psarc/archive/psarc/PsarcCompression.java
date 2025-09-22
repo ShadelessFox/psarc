@@ -1,6 +1,6 @@
 package sh.adelessfox.psarc.archive.psarc;
 
-import sh.adelessfox.psarc.util.type.FourCC;
+import wtf.reversed.toolbox.type.FourCC;
 
 import java.util.Optional;
 

@@ -1,6 +1,6 @@
 package sh.adelessfox.psarc.archive;
 
-import sh.adelessfox.psarc.util.type.FilePath;
+import sh.adelessfox.psarc.util.FilePath;
 
 public interface AssetId extends Comparable<AssetId> {
     String fullName();

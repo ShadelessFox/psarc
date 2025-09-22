@@ -3,7 +3,9 @@ package sh.adelessfox.psarc.archive.psarc;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import sh.adelessfox.psarc.archive.ArchiveWriter;
-import sh.adelessfox.psarc.hashing.HashFunction;
+import wtf.reversed.toolbox.collect.Bytes;
+import wtf.reversed.toolbox.collect.MutableBytes;
+import wtf.reversed.toolbox.hash.HashFunction;
 
 import java.io.EOFException;
 import java.io.IOException;
@@ -160,11 +162,11 @@ public final class PsarcArchiveWriter implements ArchiveWriter<PsarcAssetId> {
         }
 
         // TODO: absolute/relative/case-insensitive flags
-        byte[] hash;
+        Bytes hash;
         if (id != null) {
-            hash = HashFunction.md5().hash(id.name()).asArray();
+            hash = HashFunction.md5().hash(id.name()).asBytes();
         } else {
-            hash = new byte[16];
+            hash = MutableBytes.allocate(16);
         }
 
         return new PsarcEntry(hash, firstBlock, size, start);

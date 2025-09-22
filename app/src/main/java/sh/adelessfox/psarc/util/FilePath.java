@@ -1,4 +1,4 @@
-package sh.adelessfox.psarc.util.type;
+package sh.adelessfox.psarc.util;
 
 import java.util.ArrayList;
 import java.util.List;

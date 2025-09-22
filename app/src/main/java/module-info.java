@@ -12,12 +12,11 @@ module psarc.app {
     requires javafx.graphics;
     requires org.slf4j;
     requires org.tukaani.xz;
+    requires wtf.reversed.toolbox;
 
     exports sh.adelessfox.psarc.archive.psarc;
     exports sh.adelessfox.psarc.archive;
     exports sh.adelessfox.psarc.ui;
-    exports sh.adelessfox.psarc.util.type;
-    exports sh.adelessfox.psarc.io;
     exports sh.adelessfox.psarc.util;
     exports sh.adelessfox.psarc;
 

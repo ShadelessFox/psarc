@@ -1,7 +1,7 @@
 package sh.adelessfox.psarc.archive.psarc;
 
-import sh.adelessfox.psarc.io.BinaryReader;
-import sh.adelessfox.psarc.util.type.FourCC;
+import wtf.reversed.toolbox.io.BinaryReader;
+import wtf.reversed.toolbox.type.FourCC;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;

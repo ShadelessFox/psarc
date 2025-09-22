@@ -1,7 +1,7 @@
 package sh.adelessfox.psarc.archive.psarc;
 
 import sh.adelessfox.psarc.archive.Asset;
-import sh.adelessfox.psarc.util.type.FileSize;
+import wtf.reversed.toolbox.type.FileSize;
 
 public record PsarcAsset(
     PsarcAssetId id,

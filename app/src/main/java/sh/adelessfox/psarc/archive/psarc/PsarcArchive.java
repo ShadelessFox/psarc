@@ -3,16 +3,17 @@ package sh.adelessfox.psarc.archive.psarc;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import sh.adelessfox.psarc.archive.Archive;
-import sh.adelessfox.psarc.compression.Decompressor;
-import sh.adelessfox.psarc.hashing.HashCode;
-import sh.adelessfox.psarc.hashing.HashFunction;
-import sh.adelessfox.psarc.io.BinaryReader;
 import sh.adelessfox.psarc.util.Filenames;
+import wtf.reversed.toolbox.compress.Decompressor;
+import wtf.reversed.toolbox.hash.HashCode;
+import wtf.reversed.toolbox.hash.HashFunction;
+import wtf.reversed.toolbox.io.BinaryReader;
 
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
+import java.nio.file.FileSystems;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.*;
@@ -52,9 +53,9 @@ public final class PsarcArchive implements Archive<PsarcAssetId, PsarcAsset> {
 
         this.header = PsarcHeader.read(reader);
         this.decompressor = switch (header.compression().toString()) {
-            case "zlib" -> Decompressor.deflate();
+            case "zlib" -> Decompressor.deflate(false);
             case "lzma" -> Decompressor.lzma();
-            case "oodl" -> Decompressor.oodle();
+            case "oodl" -> Decompressor.oodle(findOodleLibrary());
             default -> throw new IOException("Unsupported compression type: " + header.compression());
         };
 
@@ -73,7 +74,7 @@ public final class PsarcArchive implements Archive<PsarcAssetId, PsarcAsset> {
 
         for (int i = 1; i < entries.size(); i++) {
             var entry = entries.get(i);
-            var hash = HashCode.fromBytes(entry.hash());
+            var hash = HashCode.ofBytes(entry.hash());
             var name = names.get(hash);
             if (name == null) {
                 log.warn("Missing name for entry with hash {}", hash);
@@ -167,4 +168,14 @@ public final class PsarcArchive implements Archive<PsarcAssetId, PsarcAsset> {
         }
     }
 
+    private static Path findOodleLibrary() throws IOException {
+        var matcher = FileSystems.getDefault().getPathMatcher("glob:**/oo2core_*_win64.dll");
+        var root = Path.of("").toAbsolutePath();
+        try (Stream<Path> stream = Files.list(root)) {
+            return stream
+                .filter(matcher::matches)
+                .findFirst()
+                .orElseThrow(() -> new FileNotFoundException("Couldn't find a suitable Oodle library file. Please obtain oo2core_X_win64.dll and put it in " + root.toAbsolutePath()));
+        }
+    }
 }
