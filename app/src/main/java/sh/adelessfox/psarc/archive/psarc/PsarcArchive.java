@@ -52,11 +52,10 @@ public final class PsarcArchive implements Archive<PsarcAssetId, PsarcAsset> {
         }
 
         this.header = PsarcHeader.read(reader);
-        this.decompressor = switch (header.compression().toString()) {
-            case "zlib" -> Decompressor.deflate(false);
-            case "lzma" -> Decompressor.lzma();
-            case "oodl" -> Decompressor.oodle(findOodleLibrary());
-            default -> throw new IOException("Unsupported compression type: " + header.compression());
+        this.decompressor = switch (header.compression()) {
+            case ZLIB -> Decompressor.deflate(false);
+            case LZMA -> Decompressor.lzma();
+            case OODLE -> Decompressor.oodle(findOodleLibrary());
         };
 
         var entries = reader.readObjects(header.tocEntries(), PsarcEntry::read);
